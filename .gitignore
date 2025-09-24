@@ -1,0 +1,29 @@
+# Dependencies
+/node_modules
+
+# Build artifacts
+/dist
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite
+.vite/
+.vite-inspect/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
