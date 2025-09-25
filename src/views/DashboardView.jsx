@@ -1,5 +1,5 @@
 import React from 'react';
-import { Euro, Briefcase, FileText } from 'lucide-react';
+import { Euro, Briefcase } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 
 const StatCard = ({ title, value, icon }) => (
@@ -16,15 +16,14 @@ const StatCard = ({ title, value, icon }) => (
     </div>
 );
 
-const DashboardView = ({ invoices, jobs, quotes }) => {
-    const unpaidInvoices = invoices.filter(i => i.status === 'Unpaid');
-    const totalOwed = unpaidInvoices.reduce((sum, inv) => sum + (inv.invoiceData?.total || 0), 0);
+const DashboardView = ({ jobs }) => {
+    const totalRevenue = jobs.reduce((sum, job) => sum + (job.total || 0), 0);
+    const activeJobs = jobs.filter(j => j.status !== 'Completed').length;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard title="Total Owed" value={formatCurrency(totalOwed)} icon={<Euro className="text-green-500"/>} />
-            <StatCard title="Active Jobs" value={jobs.filter(j => ['New', 'Quoted', 'Approved', 'In Progress'].includes(j.status)).length} icon={<Briefcase className="text-blue-500"/>} />
-            <StatCard title="Pending Quotes" value={quotes.filter(q => ['Sent', 'Draft'].includes(q.status)).length} icon={<FileText className="text-yellow-500"/>} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <StatCard title="Total Revenue" value={formatCurrency(totalRevenue)} icon={<Euro className="text-green-500"/>} />
+            <StatCard title="Active Jobs" value={activeJobs} icon={<Briefcase className="text-blue-500"/>} />
         </div>
     );
 };

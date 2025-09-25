@@ -19,7 +19,7 @@ const CustomerForm = ({ data, onSave, onClose }) => {
             <h2 className="text-2xl font-bold mb-6">{data ? 'Edit Customer' : 'New Customer'}</h2>
             <div className="grid grid-cols-1 gap-4">
                 <input name="name" value={customer.name} onChange={handleChange} placeholder="Name" className="p-2 border rounded-md" required />
-                <input name="email" type="email" value={customer.email} onChange={handleChange} placeholder="Email" className="p-2 border rounded-md" required />
+                <input name="email" type="email" value={customer.email} onChange={handleChange} placeholder="Email" className="p-2 border rounded-md" />
                 <input name="phone" value={customer.phone} onChange={handleChange} placeholder="Phone" className="p-2 border rounded-md" />
                 <input name="address" value={customer.address} onChange={handleChange} placeholder="Address" className="p-2 border rounded-md" />
             </div>

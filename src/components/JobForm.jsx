@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 
 const JobForm = ({ data, customers, onSave, onClose }) => {
-    const [job, setJob] = useState(data || { jobTitle: '', customerId: '', status: 'New', labour: [], materials: [] });
+    const [job, setJob] = useState(data || { jobTitle: '', customerId: '', status: 'New' });
 
     const handleChange = (e) => {
         const { name, value } = e.target;

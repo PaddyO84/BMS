@@ -1,0 +1,6 @@
+{
+  "appId": "com.bmsys.app",
+  "appName": "BMSys",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
