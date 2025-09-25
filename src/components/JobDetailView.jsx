@@ -10,10 +10,6 @@ const JobDetailView = ({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice
         setEditableJob(job);
     }, [job]);
 
-    if (!editableJob) {
-        return <div className="flex items-center justify-center h-full"><Loader className="animate-spin mr-2"/>Loading job details...</div>;
-    }
-
     const handleFieldChange = (field, value) => {
         setEditableJob(prev => ({ ...prev, [field]: value }));
     };
@@ -42,6 +38,14 @@ const JobDetailView = ({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice
         await onSave(editableJob);
         setIsSaving(false);
     };
+
+    if (!editableJob) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <Loader className="animate-spin mr-2"/>Loading job details...
+            </div>
+        );
+    }
 
     return (
         <div>
