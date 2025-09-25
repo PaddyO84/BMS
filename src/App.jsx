@@ -10,7 +10,6 @@ import JobForm from './components/JobForm';
 import DashboardView from './views/DashboardView';
 import CustomerListView from './views/CustomerListView';
 import JobListView from './views/JobListView';
-import InvoiceListView from './views/InvoiceListView';
 
 const ActionButton = ({ icon, label, onClick }) => (
     <button onClick={onClick} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition-colors">
