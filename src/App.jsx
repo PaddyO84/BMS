@@ -32,16 +32,26 @@ function App() {
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
 
-    const fetchData = async () => {
-        const customersData = (await db.getCustomers()).values || [];
-        setCustomers(customersData);
-        const jobsData = (await db.getJobs()).values || [];
-        setJobs(jobsData);
-        setLoading(false);
-    };
-
     useEffect(() => {
-        fetchData();
+        const setup = async () => {
+            try {
+                await db.initializeDB();
+                await fetchData();
+            } catch (err) {
+                console.error("Error during app setup:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const fetchData = async () => {
+            const customersData = (await db.getCustomers()).values || [];
+            setCustomers(customersData);
+            const jobsData = (await db.getJobs()).values || [];
+            setJobs(jobsData);
+        };
+
+        setup();
     }, []);
 
     const handleSaveCustomer = async (customerData) => {

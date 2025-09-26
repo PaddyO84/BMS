@@ -139,5 +139,5 @@ export const updateJob = async (job) => {
     }
 };
 
-// Initialize the database when the service is loaded
-initializeDB();
+// Export the initialization function to be called explicitly from the app
+export { initializeDB };
