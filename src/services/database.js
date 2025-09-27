@@ -9,13 +9,12 @@ const sqlite = new SQLiteConnection(CapacitorSQLite);
 const initializeDB = async () => {
     try {
         const platform = Capacitor.getPlatform();
-        if (platform === 'web') {
-            const jeepSqlite = document.createElement('jeep-sqlite');
+        if (platform === "web") {
+            const jeepSqlite = document.createElement("jeep-sqlite");
             document.body.appendChild(jeepSqlite);
             await customElements.whenDefined('jeep-sqlite');
             await sqlite.initWebStore();
         }
-
         const ret = await sqlite.checkConnectionsConsistency();
         const isConn = (await sqlite.isConnection(DB_NAME, false)).result;
 
@@ -86,14 +85,30 @@ export const getDB = () => {
 export const getCustomers = async () => await getDB().query('SELECT * FROM customers ORDER BY name;');
 export const getCustomerById = async (id) => await getDB().query('SELECT * FROM customers WHERE id = ?;', [id]);
 export const addCustomer = async (customer) => {
+    console.log("DB: Attempting to add customer:", customer);
     const { name, email, phone, address } = customer;
     const sql = 'INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?);';
-    return await getDB().run(sql, [name, email, phone, address]);
+    try {
+        const result = await getDB().run(sql, [name, email, phone, address]);
+        console.log("DB: Add customer successful.", result);
+        return result;
+    } catch (err) {
+        console.error("DB: FAILED to add customer.", err);
+        throw err;
+    }
 };
 export const updateCustomer = async (customer) => {
+    console.log("DB: Attempting to update customer:", customer);
     const { id, name, email, phone, address } = customer;
     const sql = 'UPDATE customers SET name = ?, email = ?, phone = ?, address = ? WHERE id = ?;';
-    return await getDB().run(sql, [name, email, phone, address, id]);
+    try {
+        const result = await getDB().run(sql, [name, email, phone, address, id]);
+        console.log("DB: Update customer successful.", result);
+        return result;
+    } catch (err) {
+        console.error("DB: FAILED to update customer.", err);
+        throw err;
+    }
 };
 
 // --- Job Operations ---
