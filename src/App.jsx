@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle, Save, User } from 'lucide-react';
+import { PullToRefresh } from '@capacitor/pull-to-refresh';
 import * as db from './services/database';
 import * as backup from './services/backup';
 import { calculateJobTotal, formatDate } from './utils/helpers';
@@ -63,6 +64,14 @@ function App() {
             try {
                 await db.initializeDB();
                 await fetchData();
+
+                PullToRefresh.init({
+                  onRefresh: async (complete) => {
+                    await fetchData();
+                    complete();
+                  }
+                });
+
                 const lastBackup = await backup.getLastBackupTimestamp();
                 const oneDay = 24 * 60 * 60 * 1000;
                 if (Date.now() - lastBackup > oneDay) {
