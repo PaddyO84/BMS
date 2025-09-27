@@ -4,7 +4,7 @@ import { formatCurrency, formatDate, generatePdf } from '../utils/helpers';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-const JobDetailView = ({ job, onBack, onSave }) => {
+const JobDetailView = ({ job, profile, onBack, onSave }) => {
     const [editableJob, setEditableJob] = useState(job);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -49,7 +49,7 @@ const JobDetailView = ({ job, onBack, onSave }) => {
             customer: job.customer,
             issueDate: formatDate(new Date()),
             dueDate: docType === 'invoice' ? formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)) : null,
-        });
+        }, profile);
 
         const fileName = `${number}.pdf`;
 

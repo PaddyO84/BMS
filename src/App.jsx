@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle, Save } from 'lucide-react';
+import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle, Save, User } from 'lucide-react';
 import * as db from './services/database';
 import * as backup from './services/backup';
 import { calculateJobTotal, formatDate } from './utils/helpers';
@@ -11,6 +11,7 @@ import JobForm from './components/JobForm';
 import DashboardView from './views/DashboardView';
 import CustomerListView from './views/CustomerListView';
 import JobListView from './views/JobListView';
+import ProfileView from './views/ProfileView';
 
 const ActionButton = ({ icon, label, onClick }) => (
     <button onClick={onClick} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition-colors">
@@ -28,6 +29,7 @@ function App() {
     const [loading, setLoading] = useState(true);
     const [customers, setCustomers] = useState([]);
     const [jobs, setJobs] = useState([]);
+    const [profile, setProfile] = useState(null);
 
     const [activeTab, setActiveTab] = useState('dashboard');
     const [modal, setModal] = useState(null);
@@ -38,6 +40,13 @@ function App() {
         setCustomers([...customersData]);
         const jobsData = (await db.getJobs()).values || [];
         setJobs([...jobsData]);
+        const profileData = await db.getBusinessProfile();
+        setProfile(profileData);
+    };
+
+    const handleSaveProfile = async (profileData) => {
+        await db.updateBusinessProfile(profileData);
+        await fetchData();
     };
 
     const handleBackup = async () => {
@@ -109,12 +118,13 @@ function App() {
 
     const renderContent = () => {
         if (selectedJobId) {
-            return <JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} />;
+            return <JobDetailView key={selectedJobId} job={selectedJob} profile={profile} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} />;
         }
         switch (activeTab) {
             case 'dashboard': return <DashboardView jobs={jobs} />;
             case 'customers': return <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>;
             case 'jobs': return <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId}/>;
+            case 'profile': return <ProfileView profile={profile} onSave={handleSaveProfile} />;
             default: return null;
         }
     };
@@ -128,6 +138,7 @@ function App() {
                         <TabButton icon={<Euro/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
                         <TabButton icon={<Users/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
                         <TabButton icon={<Briefcase/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
+                        <TabButton icon={<User/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
                     </nav>
                 </aside>
                 <main className="flex-1 p-4 md:p-8">

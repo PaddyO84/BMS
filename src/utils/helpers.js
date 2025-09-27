@@ -20,7 +20,7 @@ export const calculateJobTotal = (job) => {
     return { subTotal, taxAmount, total, taxRate };
 };
 
-export const generatePdf = (docType, data) => {
+export const generatePdf = (docType, data, profile) => {
     const doc = new jsPDF();
     const { number, job, customer, issueDate, dueDate } = data;
 
@@ -28,9 +28,11 @@ export const generatePdf = (docType, data) => {
     doc.text(docType.toUpperCase(), 15, 20);
 
     doc.setFontSize(10);
-    doc.text("Your Business Name", 150, 15);
-    doc.text("123 Business Road, Dublin", 150, 20);
-    doc.text("your.email@business.com", 150, 25);
+    doc.text(profile.name || "Your Business Name", 150, 15);
+    doc.text(profile.address || "123 Business Road, Dublin", 150, 20);
+    doc.text(profile.email || "your.email@business.com", 150, 25);
+    if(profile.phone) doc.text(`Phone: ${profile.phone}`, 150, 30);
+    if(profile.vatNumber) doc.text(`VAT: ${profile.vatNumber}`, 150, 35);
 
     doc.setFontSize(12);
     doc.text(`${docType} Number: ${number}`, 15, 40);

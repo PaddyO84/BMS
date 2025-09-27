@@ -70,8 +70,23 @@ const createSchema = async (db) => {
             cost REAL,
             FOREIGN KEY (jobId) REFERENCES jobs(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS business_profile (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            name TEXT,
+            address TEXT,
+            email TEXT,
+            phone TEXT,
+            mobile TEXT,
+            vatNumber TEXT,
+            logo TEXT
+        );
     `;
     await db.execute(schema);
+    // Ensure a default profile exists
+    const res = await db.query('SELECT * FROM business_profile WHERE id = 1;');
+    if (res.values.length === 0) {
+        await db.run('INSERT INTO business_profile (id, name) VALUES (1, "Your Business Name");');
+    }
 };
 
 export const getDB = () => {
@@ -152,6 +167,18 @@ export const updateJob = async (job) => {
         const materialSql = 'INSERT INTO materials (jobId, name, quantity, cost) VALUES (?, ?, ?, ?);';
         await getDB().run(materialSql, [id, item.name, item.quantity, item.cost]);
     }
+};
+
+// --- Business Profile Operations ---
+export const getBusinessProfile = async () => {
+    const res = await getDB().query('SELECT * FROM business_profile WHERE id = 1;');
+    return res.values[0];
+};
+
+export const updateBusinessProfile = async (profile) => {
+    const { name, address, email, phone, mobile, vatNumber, logo } = profile;
+    const sql = 'UPDATE business_profile SET name = ?, address = ?, email = ?, phone = ?, mobile = ?, vatNumber = ?, logo = ? WHERE id = 1;';
+    return await getDB().run(sql, [name, address, email, phone, mobile, vatNumber, logo]);
 };
 
 // Export the initialization function to be called explicitly from the app
