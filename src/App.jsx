@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle } from 'lucide-react';
+import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle, Save } from 'lucide-react';
 import * as db from './services/database';
+import * as backup from './services/backup';
 import { calculateJobTotal, formatDate } from './utils/helpers';
 
 import JobDetailView from './components/JobDetailView';
@@ -32,25 +33,38 @@ function App() {
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
 
+    const fetchData = async () => {
+        const customersData = (await db.getCustomers()).values || [];
+        setCustomers([...customersData]);
+        const jobsData = (await db.getJobs()).values || [];
+        setJobs([...jobsData]);
+    };
+
+    const handleBackup = async () => {
+        const success = await backup.createBackup();
+        if (success) {
+            alert('Backup created successfully!');
+        } else {
+            alert('Backup failed. Check logs for details.');
+        }
+    };
+
     useEffect(() => {
         const setup = async () => {
             try {
                 await db.initializeDB();
                 await fetchData();
+                const lastBackup = await backup.getLastBackupTimestamp();
+                const oneDay = 24 * 60 * 60 * 1000;
+                if (Date.now() - lastBackup > oneDay) {
+                    await backup.createBackup();
+                }
             } catch (err) {
                 console.error("Error during app setup:", err);
             } finally {
                 setLoading(false);
             }
         };
-
-        const fetchData = async () => {
-            const customersData = (await db.getCustomers()).values || [];
-            setCustomers([...customersData]);
-            const jobsData = (await db.getJobs()).values || [];
-            setJobs([...jobsData]);
-        };
-
         setup();
     }, []);
 
@@ -119,7 +133,8 @@ function App() {
                 <main className="flex-1 p-4 md:p-8">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-3xl font-bold text-gray-800 capitalize">{selectedJobId ? 'Job Details' : activeTab}</h2>
-                        <div>
+                        <div className="flex space-x-2">
+                            {!selectedJobId && activeTab === 'dashboard' && <ActionButton icon={<Save/>} label="Backup Now" onClick={handleBackup}/>}
                             {!selectedJobId && activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
                             {!selectedJobId && activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
                         </div>

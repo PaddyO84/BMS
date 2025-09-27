@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Loader, Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
-import { formatCurrency } from '../utils/helpers';
+import { Loader, Plus, Trash2, ArrowLeft, Save, FileText } from 'lucide-react';
+import { formatCurrency, formatDate, generatePdf } from '../utils/helpers';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 const JobDetailView = ({ job, onBack, onSave }) => {
     const [editableJob, setEditableJob] = useState(job);
@@ -39,6 +41,39 @@ const JobDetailView = ({ job, onBack, onSave }) => {
         setIsSaving(false);
     };
 
+    const handleGenerateAndShare = async (docType) => {
+        const number = `${docType.toUpperCase()}-${job.id}`;
+        const pdfData = generatePdf(docType, {
+            number: number,
+            job: job,
+            customer: job.customer,
+            issueDate: formatDate(new Date()),
+            dueDate: docType === 'invoice' ? formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)) : null,
+        });
+
+        const fileName = `${number}.pdf`;
+
+        try {
+            const result = await Filesystem.writeFile({
+                path: fileName,
+                data: pdfData,
+                directory: Directory.Documents,
+                recursive: true
+            });
+
+            await Share.share({
+                title: `${docType.charAt(0).toUpperCase() + docType.slice(1)} for ${job.jobTitle}`,
+                text: `Here is the ${docType} for ${job.jobTitle}.`,
+                url: result.uri,
+                dialogTitle: `Share ${docType}`,
+            });
+
+        } catch (error) {
+            console.error("Error sharing file", error);
+            alert(`Could not share ${docType}. Please try again.`);
+        }
+    };
+
     if (!editableJob) {
         return <div className="flex items-center justify-center h-full"><Loader className="animate-spin mr-2"/>Loading...</div>;
     }
@@ -55,10 +90,14 @@ const JobDetailView = ({ job, onBack, onSave }) => {
                         <h2 className="text-2xl font-bold">{editableJob.jobTitle}</h2>
                         <p className="text-gray-600">{editableJob.customer?.name}</p>
                     </div>
-                    <button onClick={handleSave} className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center" disabled={isSaving}>
-                        {isSaving ? <Loader size={16} className="animate-spin mr-1"/> : <Save size={16} className="mr-1" />}
-                        Save
-                    </button>
+                    <div className="flex space-x-2">
+                        <button onClick={() => handleGenerateAndShare('quote')} className="p-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center"><FileText size={16} className="mr-1"/>Quote</button>
+                        <button onClick={() => handleGenerateAndShare('invoice')} className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"><FileText size={16} className="mr-1"/>Invoice</button>
+                        <button onClick={handleSave} className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center" disabled={isSaving}>
+                            {isSaving ? <Loader size={16} className="animate-spin mr-1"/> : <Save size={16} className="mr-1" />}
+                            Save
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
