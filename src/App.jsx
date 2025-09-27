@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader, Euro, Users, Briefcase, FileText, Plus, Download, AlertCircle, Save, User } from 'lucide-react';
+import { Loader, Euro, Users, Briefcase, FileText, Plus, Save, User } from 'lucide-react';
 import { PullToRefresh } from '@capacitor/pull-to-refresh';
 import * as db from './services/database';
 import * as backup from './services/backup';
@@ -9,6 +9,7 @@ import JobDetailView from './components/JobDetailView';
 import Modal from './components/Modal';
 import CustomerForm from './components/CustomerForm';
 import JobForm from './components/JobForm';
+import ProfileForm from './components/ProfileForm';
 import DashboardView from './views/DashboardView';
 import CustomerListView from './views/CustomerListView';
 import JobListView from './views/JobListView';
@@ -48,6 +49,7 @@ function App() {
     const handleSaveProfile = async (profileData) => {
         await db.updateBusinessProfile(profileData);
         await fetchData();
+        setModal(null);
     };
 
     const handleBackup = async () => {

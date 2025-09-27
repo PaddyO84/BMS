@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
+import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 
 const DB_NAME = 'bmsys_db';
 
@@ -82,7 +82,6 @@ const createSchema = async (db) => {
         );
     `;
     await db.execute(schema);
-    // Ensure a default profile exists
     const res = await db.query('SELECT * FROM business_profile WHERE id = 1;');
     if (res.values.length === 0) {
         await db.run('INSERT INTO business_profile (id, name) VALUES (1, "Your Business Name");');
@@ -100,30 +99,14 @@ export const getDB = () => {
 export const getCustomers = async () => await getDB().query('SELECT * FROM customers ORDER BY name;');
 export const getCustomerById = async (id) => await getDB().query('SELECT * FROM customers WHERE id = ?;', [id]);
 export const addCustomer = async (customer) => {
-    console.log("DB: Attempting to add customer:", customer);
     const { name, email, phone, address } = customer;
     const sql = 'INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?);';
-    try {
-        const result = await getDB().run(sql, [name, email, phone, address]);
-        console.log("DB: Add customer successful.", result);
-        return result;
-    } catch (err) {
-        console.error("DB: FAILED to add customer.", err);
-        throw err;
-    }
+    return await getDB().run(sql, [name, email, phone, address]);
 };
 export const updateCustomer = async (customer) => {
-    console.log("DB: Attempting to update customer:", customer);
     const { id, name, email, phone, address } = customer;
     const sql = 'UPDATE customers SET name = ?, email = ?, phone = ?, address = ? WHERE id = ?;';
-    try {
-        const result = await getDB().run(sql, [name, email, phone, address, id]);
-        console.log("DB: Update customer successful.", result);
-        return result;
-    } catch (err) {
-        console.error("DB: FAILED to update customer.", err);
-        throw err;
-    }
+    return await getDB().run(sql, [name, email, phone, address, id]);
 };
 
 // --- Job Operations ---
@@ -150,15 +133,12 @@ export const addJob = async (job) => {
 export const updateJob = async (job) => {
     const { id, customerId, jobTitle, status, taxRate, subTotal, taxAmount, total, labour, materials } = job;
 
-    // Update main job table
     const jobSql = 'UPDATE jobs SET customerId = ?, jobTitle = ?, status = ?, taxRate = ?, subTotal = ?, taxAmount = ?, total = ? WHERE id = ?;';
     await getDB().run(jobSql, [customerId, jobTitle, status, taxRate, subTotal, taxAmount, total, id]);
 
-    // Clear existing labour/materials
     await getDB().run('DELETE FROM labour WHERE jobId = ?;', [id]);
     await getDB().run('DELETE FROM materials WHERE jobId = ?;', [id]);
 
-    // Add new labour/materials
     for (const item of labour || []) {
         const labourSql = 'INSERT INTO labour (jobId, description, hours, rate) VALUES (?, ?, ?, ?);';
         await getDB().run(labourSql, [id, item.description, item.hours, item.rate]);
@@ -181,5 +161,4 @@ export const updateBusinessProfile = async (profile) => {
     return await getDB().run(sql, [name, address, email, phone, mobile, vatNumber, logo]);
 };
 
-// Export the initialization function to be called explicitly from the app
 export { initializeDB };
