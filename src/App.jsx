@@ -46,9 +46,9 @@ function App() {
 
         const fetchData = async () => {
             const customersData = (await db.getCustomers()).values || [];
-            setCustomers(customersData);
+            setCustomers([...customersData]);
             const jobsData = (await db.getJobs()).values || [];
-            setJobs(jobsData);
+            setJobs([...jobsData]);
         };
 
         setup();
@@ -61,7 +61,7 @@ function App() {
             await db.addCustomer(customerData);
         }
         setModal(null);
-        fetchData();
+        await fetchData();
     };
 
     const handleSaveJob = async (jobData) => {
