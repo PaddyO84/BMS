@@ -97,7 +97,7 @@ function App() {
             setSelectedJobId(newJobId);
         }
         setModal(null);
-        fetchData();
+        await fetchData();
     };
 
     const selectedJob = React.useMemo(() => {
