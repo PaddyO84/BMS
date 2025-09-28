@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader } from 'lucide-react';
-import { Capacitor, PullToRefresh } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import * as db from './services/database';
 import * as backup from './services/backup';
@@ -44,13 +44,6 @@ function App() {
                 await fetchData();
 
                 if (Capacitor.isNativePlatform()) {
-                     PullToRefresh.init({
-                        onRefresh: async (complete) => {
-                            await fetchData();
-                            complete();
-                        },
-                    });
-
                     CapacitorApp.addListener('appStateChange', ({ isActive }) => {
                         if (isActive) {
                             fetchData();
