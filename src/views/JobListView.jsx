@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Briefcase } from 'lucide-react';
 
 const JobStatusBadge = ({ status }) => {
@@ -17,7 +18,8 @@ const JobStatusBadge = ({ status }) => {
     );
 };
 
-const JobListView = ({ jobs, customers, onSelectJob }) => {
+const JobListView = ({ jobs, customers }) => {
+    const navigate = useNavigate();
     const customerMap = React.useMemo(() =>
         customers.reduce((acc, c) => {
             acc[c.id] = c.name;
@@ -29,7 +31,7 @@ const JobListView = ({ jobs, customers, onSelectJob }) => {
             <div className="p-6">
                 {jobs.length > 0 ? (
                     jobs.map(job => (
-                        <div key={job.id} onClick={() => onSelectJob(job.id)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md transition-colors">
+                        <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md transition-colors">
                             <div className="flex justify-between items-center">
                                 <div>
                                     <p className="font-bold text-gray-900">{job.jobTitle}</p>

@@ -111,15 +111,32 @@ export const updateCustomer = async (customer) => {
 
 // --- Job Operations ---
 export const getJobs = async () => {
-    const jobsResult = await getDB().query('SELECT * FROM jobs ORDER BY createdAt DESC;');
+    const db = getDB();
+    const [jobsResult, labourResult, materialsResult] = await Promise.all([
+        db.query('SELECT * FROM jobs ORDER BY createdAt DESC;'),
+        db.query('SELECT * FROM labour;'),
+        db.query('SELECT * FROM materials;')
+    ]);
+
     const jobs = jobsResult.values || [];
-    for (const job of jobs) {
-        const labourResult = await getDB().query('SELECT * FROM labour WHERE jobId = ?;', [job.id]);
-        job.labour = labourResult.values || [];
-        const materialsResult = await getDB().query('SELECT * FROM materials WHERE jobId = ?;', [job.id]);
-        job.materials = materialsResult.values || [];
+    const labourItems = labourResult.values || [];
+    const materialItems = materialsResult.values || [];
+
+    const jobsById = new Map(jobs.map(job => [job.id, { ...job, labour: [], materials: [] }]));
+
+    for (const item of labourItems) {
+        if (jobsById.has(item.jobId)) {
+            jobsById.get(item.jobId).labour.push(item);
+        }
     }
-    return { values: jobs };
+
+    for (const item of materialItems) {
+        if (jobsById.has(item.jobId)) {
+            jobsById.get(item.jobId).materials.push(item);
+        }
+    }
+
+    return { values: Array.from(jobsById.values()) };
 };
 
 export const addJob = async (job) => {
