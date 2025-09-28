@@ -1,41 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Loader, Euro, Users, Briefcase, FileText, Plus, Save, User } from 'lucide-react';
-import { PullToRefresh } from '@capacitor/pull-to-refresh';
+import { Loader } from 'lucide-react';
+import { Capacitor, PullToRefresh } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import * as db from './services/database';
 import * as backup from './services/backup';
-import { calculateJobTotal, formatDate } from './utils/helpers';
-
-import JobDetailView from './components/JobDetailView';
-import Modal from './components/Modal';
-import CustomerForm from './components/CustomerForm';
-import JobForm from './components/JobForm';
-import ProfileForm from './components/ProfileForm';
-import DashboardView from './views/DashboardView';
-import CustomerListView from './views/CustomerListView';
-import JobListView from './views/JobListView';
-import ProfileView from './views/ProfileView';
-
-const ActionButton = ({ icon, label, onClick }) => (
-    <button onClick={onClick} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition-colors">
-        {icon} <span className="ml-2">{label}</span>
-    </button>
-);
-
-const TabButton = ({ icon, label, isActive, onClick }) => (
-    <button onClick={onClick} className={`flex items-center w-full text-left px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-        {icon} <span className="ml-3 font-semibold">{label}</span>
-    </button>
-);
+import { calculateJobTotal } from './utils/helpers';
+import AppRouter from './Router';
 
 function App() {
     const [loading, setLoading] = useState(true);
     const [customers, setCustomers] = useState([]);
     const [jobs, setJobs] = useState([]);
     const [profile, setProfile] = useState(null);
-
-    const [activeTab, setActiveTab] = useState('dashboard');
     const [modal, setModal] = useState(null);
-    const [selectedJobId, setSelectedJobId] = useState(null);
 
     const fetchData = async () => {
         const customersData = (await db.getCustomers()).values || [];
@@ -49,7 +26,6 @@ function App() {
     const handleSaveProfile = async (profileData) => {
         await db.updateBusinessProfile(profileData);
         await fetchData();
-        setModal(null);
     };
 
     const handleBackup = async () => {
@@ -67,19 +43,27 @@ function App() {
                 await db.initializeDB();
                 await fetchData();
 
-                PullToRefresh.init({
-                  onRefresh: async (complete) => {
-                    await fetchData();
-                    complete();
-                  }
-                });
+                if (Capacitor.isNativePlatform()) {
+                     PullToRefresh.init({
+                        onRefresh: async (complete) => {
+                            await fetchData();
+                            complete();
+                        },
+                    });
 
+                    CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+                        if (isActive) {
+                            fetchData();
+                        }
+                    });
+                }
+                
                 const lastBackup = await backup.getLastBackupTimestamp();
                 const oneDay = 24 * 60 * 60 * 1000;
                 if (Date.now() - lastBackup > oneDay) {
                     await backup.createBackup();
                 }
-            } catch (err) {
+            } catch (err) => {
                 console.error("Error during app setup:", err);
             } finally {
                 setLoading(false);
@@ -99,78 +83,35 @@ function App() {
     };
 
     const handleSaveJob = async (jobData) => {
+        let newJobId = null;
         if (jobData.id) {
-             const totals = calculateJobTotal(jobData);
-             const jobWithTotals = { ...jobData, ...totals };
-             await db.updateJob(jobWithTotals);
+            const totals = calculateJobTotal(jobData);
+            const jobWithTotals = { ...jobData, ...totals };
+            await db.updateJob(jobWithTotals);
         } else {
-            const newJobId = await db.addJob(jobData);
-            setSelectedJobId(newJobId);
+            newJobId = await db.addJob(jobData);
         }
         setModal(null);
         await fetchData();
+        return newJobId;
     };
-
-    const selectedJob = React.useMemo(() => {
-        if (!selectedJobId) return null;
-        const job = jobs.find(j => j.id === selectedJobId);
-        if(!job) return null;
-        const jobTotal = calculateJobTotal(job);
-        return {
-            ...job,
-            ...jobTotal,
-            customer: customers.find(c => c.id === job.customerId),
-        };
-    }, [selectedJobId, jobs, customers]);
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen bg-gray-100"><Loader className="animate-spin mr-2"/>Loading...</div>;
     }
 
-    const renderContent = () => {
-        if (selectedJobId) {
-            return <JobDetailView key={selectedJobId} job={selectedJob} profile={profile} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} />;
-        }
-        switch (activeTab) {
-            case 'dashboard': return <DashboardView jobs={jobs} />;
-            case 'customers': return <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>;
-            case 'jobs': return <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId}/>;
-            case 'profile': return <ProfileView profile={profile} onSave={handleSaveProfile} />;
-            default: return null;
-        }
-    };
-
     return (
-        <div className="bg-gray-50 font-sans min-h-screen">
-            <div className="flex flex-col md:flex-row">
-                <aside className="w-full md:w-64 bg-white md:min-h-screen p-4 border-r border-gray-200 shadow-md">
-                    <h1 className="text-2xl font-bold text-indigo-600 mb-6 px-4">BMSys</h1>
-                    <nav className="flex flex-row md:flex-col justify-around md:justify-start md:space-y-2">
-                        <TabButton icon={<Euro/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<Users/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<Briefcase/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<User/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
-                    </nav>
-                </aside>
-                <main className="flex-1 p-4 md:p-8">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-3xl font-bold text-gray-800 capitalize">{selectedJobId ? 'Job Details' : activeTab}</h2>
-                        <div className="flex space-x-2">
-                            {!selectedJobId && activeTab === 'dashboard' && <ActionButton icon={<Save/>} label="Backup Now" onClick={handleBackup}/>}
-                            {!selectedJobId && activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
-                            {!selectedJobId && activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
-                        </div>
-                    </div>
-                    {renderContent()}
-                </main>
-            </div>
-            {modal && (
-                <Modal onClose={() => setModal(null)}>
-                    {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)}/>}
-                    {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)}/>}
-                </Modal>
-            )}
-        </div>
+        <AppRouter
+            customers={customers}
+            jobs={jobs}
+            profile={profile}
+            onSaveProfile={handleSaveProfile}
+            onSaveCustomer={handleSaveCustomer}
+            onSaveJob={handleSaveJob}
+            handleBackup={handleBackup}
+            modal={modal}
+            setModal={setModal}
+        />
     );
 }
 
