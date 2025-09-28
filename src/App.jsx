@@ -63,7 +63,7 @@ function App() {
                 if (Date.now() - lastBackup > oneDay) {
                     await backup.createBackup();
                 }
-            } catch (err) => {
+            } catch (err) {
                 console.error("Error during app setup:", err);
             } finally {
                 setLoading(false);
