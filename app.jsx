@@ -242,6 +242,26 @@ function App() {
         return { ...job, ...calculateJobTotal(job), customer: customers.find(c => c.id === job.customerId), quote: quotes.find(q => q.jobId === job.id), invoice: invoices.find(i => i.jobId === job.id) };
     }, [selectedJobId, jobs, customers, quotes, invoices]);
 
+    const SidebarContent = () => (
+        <div className="flex flex-col h-full">
+            <h1 className="text-2xl font-bold text-indigo-600 mb-6">BizFlow</h1>
+            <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-800 capitalize mb-4">{activeTab}</h2>
+                {activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
+                {activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
+                {activeTab === 'dashboard' && <ActionButton icon={<Download />} label="Export Data" onClick={handleExport} />}
+            </div>
+            <nav className="flex flex-col space-y-1">
+                <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+            </nav>
+            {user && <div className="mt-auto p-3 bg-indigo-50 rounded-lg"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
+        </div>
+    );
+
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><Loader className="animate-spin mr-2"/>Loading Business Manager...</div>;
     if (!user || authError) return <div className="flex flex-col items-center justify-center h-screen bg-gray-100 text-red-500"><AlertCircle className="w-12 h-12 mb-4"/>Authentication failed. Please refresh. <p className="text-sm mt-2">{authError}</p></div>;
 
@@ -249,69 +269,39 @@ function App() {
         <div className="bg-gray-50 font-sans min-h-screen">
             <PullToRefreshIndicator isRefreshing={isRefreshing} pullPosition={pullPosition} />
 
-            {/* Mobile Header */}
-            <header className="md:hidden bg-white shadow-md p-4 flex justify-between items-center z-40">
-                <h1 className="text-xl font-bold text-indigo-600">BizFlow</h1>
-                <button onClick={() => setIsMenuOpen(true)}>
-                    <Menu size={24} />
-                </button>
-            </header>
-
-            <div className="flex flex-col md:flex-row">
-                {/* Desktop Sidebar */}
-                <aside className="hidden md:flex flex-col w-full md:w-64 bg-white p-4 border-r border-gray-200 shadow-md">
-                    <h1 className="text-2xl font-bold text-indigo-600 mb-6">BizFlow</h1>
-                    <nav className="flex flex-col space-y-1">
-                        <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
-                        <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
-                    </nav>
-                    {user && <div className="mt-auto p-3 bg-indigo-50 rounded-lg"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
+            <div className="flex flex-row">
+                {/* Unified Sidebar for Desktop */}
+                <aside className="hidden md:flex flex-col w-64 bg-white p-4 border-r border-gray-200 shadow-md">
+                    <SidebarContent />
                 </aside>
 
-                {/* Mobile Menu Overlay */}
-                {isMenuOpen && (
-                    <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50">
-                        <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg p-4">
-                            <div className="flex justify-between items-center mb-6">
-                                <h1 className="text-xl font-bold text-indigo-600">Menu</h1>
-                                <button onClick={() => setIsMenuOpen(false)}>
-                                    <X size={24} />
-                                </button>
-                            </div>
-                            <nav className="flex flex-col space-y-2">
-                                <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                                <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                                <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                                <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                                <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                            </nav>
-                        </div>
+                {/* Mobile Menu Overlay & Sidebar */}
+                <div className={`md:hidden fixed inset-0 z-50 transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                    <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setIsMenuOpen(false)}></div>
+                    <div className="relative w-64 bg-white h-full shadow-lg p-4">
+                        <SidebarContent />
                     </div>
-                )}
+                </div>
 
-                <main className="flex-1 p-2 sm:p-4 md:p-8">
-                {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice} onOpenSendModal={(type) => setModal({ type: 'send', data: { docType: type, job: selectedJob } })}/>)
-                : (<>
-                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl md:text-3xl font-bold text-gray-800 capitalize">{activeTab}</h2><div>
-                        {activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
-                        {activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
-                        {activeTab === 'dashboard' && <ActionButton icon={<Download />} label="Export Data" onClick={handleExport} />}
-                    </div></div>
-                    {activeTab === 'dashboard' && <DashboardView invoices={invoices} jobs={jobs} quotes={quotes} />}
-                    {activeTab === 'customers' && <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>}
-                    {activeTab === 'jobs' && <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId}/>}
-                    {activeTab === 'invoices' && <InvoiceListView invoices={invoices} jobs={jobs} customers={customers} onUpdateStatus={handleUpdateInvoiceStatus} />}
-                </>)}
-            </main>
+                <main className="flex-1 p-2 sm:p-4 md:p-8 relative">
+                    <button className="md:hidden p-2 mb-4" onClick={() => setIsMenuOpen(true)}>
+                        <Menu size={24} />
+                    </button>
+                    {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice} onOpenSendModal={(type) => setModal({ type: 'send', data: { docType: type, job: selectedJob } })}/>)
+                    : (<>
+                        {activeTab === 'dashboard' && <DashboardView invoices={invoices} jobs={jobs} quotes={quotes} />}
+                        {activeTab === 'customers' && <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>}
+                        {activeTab === 'jobs' && <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId}/>}
+                        {activeTab === 'invoices' && <InvoiceListView invoices={invoices} jobs={jobs} customers={customers} onUpdateStatus={handleUpdateInvoiceStatus} />}
+                    </>)}
+                </main>
+            </div>
+            {modal && <Modal onClose={() => setModal(null)}>
+                {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)} isSaving={isSaving} />}
+                {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)}/>}
+                {modal.type === 'send' && <SendDocumentModal data={modal.data} onClose={() => setModal(null)}/>}
+            </Modal>}
         </div>
-        {modal && <Modal onClose={() => setModal(null)}>
-            {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)} isSaving={isSaving} />}
-            {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)}/>}
-            {modal.type === 'send' && <SendDocumentModal data={modal.data} onClose={() => setModal(null)}/>}
-        </Modal>}</div>
     );
 }
 
