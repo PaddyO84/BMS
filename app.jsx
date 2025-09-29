@@ -14,7 +14,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft, User } from 'lucide-react';
+import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft, User, Menu } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { usePullToRefresh, PullToRefreshIndicator } from './hooks/usePullToRefresh';
@@ -111,6 +111,7 @@ function App() {
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const setupDataListeners = useCallback(() => {
         if (!user) return () => {};
@@ -247,19 +248,51 @@ function App() {
     return (
         <div className="bg-gray-50 font-sans min-h-screen">
             <PullToRefreshIndicator isRefreshing={isRefreshing} pullPosition={pullPosition} />
+
+            {/* Mobile Header */}
+            <header className="md:hidden bg-white shadow-md p-4 flex justify-between items-center z-40">
+                <h1 className="text-xl font-bold text-indigo-600">BizFlow</h1>
+                <button onClick={() => setIsMenuOpen(true)}>
+                    <Menu size={24} />
+                </button>
+            </header>
+
             <div className="flex flex-col md:flex-row">
-                <aside className="w-full md:w-64 bg-white p-2 md:p-4 border-b md:border-r md:border-b-0 border-gray-200 shadow-md">
-                    <h1 className="text-xl md:text-2xl font-bold text-indigo-600 mb-4 text-center md:text-left">BizFlow</h1>
-                <nav className="flex flex-row md:flex-col justify-start md:justify-start space-x-2 md:space-x-0 md:space-y-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
-                    <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
-                </nav>
-                {user && <div className="mt-8 p-3 bg-indigo-50 rounded-lg hidden md:block"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
-            </aside>
-            <main className="flex-1 p-2 sm:p-4 md:p-8">
+                {/* Desktop Sidebar */}
+                <aside className="hidden md:flex flex-col w-full md:w-64 bg-white p-4 border-r border-gray-200 shadow-md">
+                    <h1 className="text-2xl font-bold text-indigo-600 mb-6">BizFlow</h1>
+                    <nav className="flex flex-col space-y-1">
+                        <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
+                        <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
+                        <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
+                        <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
+                        <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
+                    </nav>
+                    {user && <div className="mt-auto p-3 bg-indigo-50 rounded-lg"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
+                </aside>
+
+                {/* Mobile Menu Overlay */}
+                {isMenuOpen && (
+                    <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+                        <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg p-4">
+                            <div className="flex justify-between items-center mb-6">
+                                <h1 className="text-xl font-bold text-indigo-600">Menu</h1>
+                                <button onClick={() => setIsMenuOpen(false)}>
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <nav className="flex flex-col space-y-2">
+                                <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                                <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                                <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                                <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                                <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
+                            </nav>
+                        </div>
+                    </div>
+                )}
+
+                <main className="flex-1 p-2 sm:p-4 md:p-8">
                 {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice} onOpenSendModal={(type) => setModal({ type: 'send', data: { docType: type, job: selectedJob } })}/>)
                 : (<>
                     <div className="flex justify-between items-center mb-6"><h2 className="text-2xl md:text-3xl font-bold text-gray-800 capitalize">{activeTab}</h2><div>
