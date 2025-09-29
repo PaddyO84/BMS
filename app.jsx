@@ -14,7 +14,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft } from 'lucide-react';
+import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft, User } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { usePullToRefresh, PullToRefreshIndicator } from './hooks/usePullToRefresh';
@@ -110,6 +110,7 @@ function App() {
     const [invoices, setInvoices] = useState([]);
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const setupDataListeners = useCallback(() => {
         if (!user) return () => {};
@@ -176,13 +177,21 @@ function App() {
 
     const handleSaveCustomer = async (customerData) => {
         if (!user) return;
-        const customerWithOwnership = { ...customerData, ownerId: user.uid, lastUpdated: serverTimestamp() };
-        if (customerData.id) {
-            await setDoc(doc(getCollectionRef('customers'), customerData.id), customerWithOwnership, { merge: true });
-        } else {
-            await addDoc(getCollectionRef('customers'), { ...customerWithOwnership, createdAt: serverTimestamp() });
+        setIsSaving(true);
+        try {
+            const customerWithOwnership = { ...customerData, ownerId: user.uid, lastUpdated: serverTimestamp() };
+            if (customerData.id) {
+                await setDoc(doc(getCollectionRef('customers'), customerData.id), customerWithOwnership, { merge: true });
+            } else {
+                await addDoc(getCollectionRef('customers'), { ...customerWithOwnership, createdAt: serverTimestamp() });
+            }
+            setModal(null);
+        } catch (error) {
+            console.error("Error saving customer:", error);
+            alert("Failed to save customer. Please try again.");
+        } finally {
+            setIsSaving(false);
         }
-        setModal(null);
     };
 
     const handleSaveJob = async (jobData) => {
@@ -241,11 +250,12 @@ function App() {
             <div className="flex flex-col md:flex-row">
                 <aside className="w-full md:w-64 bg-white p-2 md:p-4 border-b md:border-r md:border-b-0 border-gray-200 shadow-md">
                     <h1 className="text-xl md:text-2xl font-bold text-indigo-600 mb-4 text-center md:text-left">BizFlow</h1>
-                <nav className="flex flex-row md:flex-col justify-center md:justify-start space-x-2 md:space-x-0 md:space-y-1">
+                <nav className="flex flex-row md:flex-col justify-start md:justify-start space-x-2 md:space-x-0 md:space-y-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
                     <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
                     <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
                     <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
                     <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
+                    <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); }}/>
                 </nav>
                 {user && <div className="mt-8 p-3 bg-indigo-50 rounded-lg hidden md:block"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
             </aside>
@@ -265,7 +275,7 @@ function App() {
             </main>
         </div>
         {modal && <Modal onClose={() => setModal(null)}>
-            {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)}/>}
+            {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)} isSaving={isSaving} />}
             {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)}/>}
             {modal.type === 'send' && <SendDocumentModal data={modal.data} onClose={() => setModal(null)}/>}
         </Modal>}</div>
@@ -401,22 +411,26 @@ const Modal = ({ children, onClose }) => (
     </div>
 );
 
-const CustomerForm = ({ data, onSave, onClose }) => {
+const CustomerForm = ({ data, onSave, onClose, isSaving }) => {
     const [customer, setCustomer] = useState(data || { name: '', email: '', phone: '', address: '' });
     const handleChange = (e) => setCustomer(p => ({ ...p, [e.target.name]: e.target.value }));
     const handleSubmit = (e) => { e.preventDefault(); onSave(customer); };
     return (
         <form onSubmit={handleSubmit}>
             <h3 className="text-lg font-semibold mb-4">{data ? 'Edit Customer' : 'New Customer'}</h3>
-            <div className="space-y-3">
+            <fieldset disabled={isSaving} className="space-y-3">
                 <input name="name" value={customer.name} onChange={handleChange} placeholder="Name" className="w-full p-2 border rounded" required />
                 <input name="email" value={customer.email} onChange={handleChange} placeholder="Email" type="email" className="w-full p-2 border rounded" />
                 <input name="phone" value={customer.phone} onChange={handleChange} placeholder="Phone" className="w-full p-2 border rounded" />
                 <textarea name="address" value={customer.address} onChange={handleChange} placeholder="Address" className="w-full p-2 border rounded" rows="3" />
-            </div>
+            </fieldset>
             <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 space-y-2 space-y-reverse sm:space-y-0">
-                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save</button>
-                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto disabled:bg-indigo-400" disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto" disabled={isSaving}>
+                    Cancel
+                </button>
             </div>
         </form>
     );
