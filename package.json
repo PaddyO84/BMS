@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "mkdir -p public/assets && cp node_modules/sql.js/dist/sql-wasm.wasm public/assets/ && vite build",
+    "build": "mkdirp public/assets && copyfiles -u 1 node_modules/sql.js/dist/sql-wasm.wasm public/assets && vite build",
     "clean": "rimraf dist android/app/src/main/assets/public",
     "build:android": "npm run clean && npm run build && npx cap copy android",
     "preview": "vite preview"
@@ -31,6 +31,8 @@
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.14",
+    "copyfiles": "^2.4.1",
+    "mkdirp": "^3.0.1",
     "postcss": "^8.4.27",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.3.3",
