@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "clean": "rimraf dist android/app/src/main/assets/public && (cd android && ./gradlew clean)",
+    "clean": "rimraf dist android/app/src/main/assets/public",
     "build:android": "npm run clean && vite build && npx cap copy android",
     "preview": "vite preview"
   },
