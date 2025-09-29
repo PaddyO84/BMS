@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import {
@@ -14,9 +14,10 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle } from 'lucide-react';
+import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { usePullToRefresh, PullToRefreshIndicator } from './hooks/usePullToRefresh';
 
 // --- MOCK CONFIG (WILL BE REPLACED BY HOSTING ENVIRONMENT) ---
 const firebaseConfig = typeof __firebase_config !== 'undefined'
@@ -110,6 +111,43 @@ function App() {
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
 
+    const setupDataListeners = useCallback(() => {
+        if (!user) return () => {};
+
+        console.log("Setting up data listeners...");
+        const baseCollectionPath = `artifacts/${appId}/public/data`;
+        const ownerQuery = where("ownerId", "==", user.uid);
+
+        const unsubCustomers = onSnapshot(query(collection(db, `${baseCollectionPath}/customers`), ownerQuery), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const unsubJobs = onSnapshot(query(collection(db, `${baseCollectionPath}/jobs`), ownerQuery), (snapshot) => {
+            const jobsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            jobsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            setJobs(jobsData);
+        });
+        const unsubQuotes = onSnapshot(query(collection(db, `${baseCollectionPath}/quotes`), ownerQuery), s => setQuotes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const unsubInvoices = onSnapshot(query(collection(db, `${baseCollectionPath}/invoices`), ownerQuery), s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+        return () => {
+            console.log("Tearing down data listeners...");
+            unsubCustomers();
+            unsubJobs();
+            unsubQuotes();
+            unsubInvoices();
+        };
+    }, [user]);
+
+    const handleRefresh = async () => {
+        console.log("Refreshing data...");
+        const tearDown = setupDataListeners();
+        // We can add a small delay to give a better UX
+        await new Promise(res => setTimeout(res, 1000));
+        tearDown(); // Tear down old listeners
+        setupDataListeners(); // Set up new ones
+        console.log("Data refreshed!");
+    };
+
+    const { isRefreshing, pullPosition } = usePullToRefresh(handleRefresh);
+
     useEffect(() => {
         const authAction = async (token) => {
             try {
@@ -130,19 +168,9 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (!user) return;
-        const baseCollectionPath = `artifacts/${appId}/public/data`;
-        const ownerQuery = where("ownerId", "==", user.uid);
-        const unsubCustomers = onSnapshot(query(collection(db, `${baseCollectionPath}/customers`), ownerQuery), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubJobs = onSnapshot(query(collection(db, `${baseCollectionPath}/jobs`), ownerQuery), (snapshot) => {
-            const jobsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            jobsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            setJobs(jobsData);
-        });
-        const unsubQuotes = onSnapshot(query(collection(db, `${baseCollectionPath}/quotes`), ownerQuery), s => setQuotes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubInvoices = onSnapshot(query(collection(db, `${baseCollectionPath}/invoices`), ownerQuery), s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        return () => { unsubCustomers(); unsubJobs(); unsubQuotes(); unsubInvoices(); };
-    }, [user]);
+        const tearDown = setupDataListeners();
+        return () => tearDown();
+    }, [setupDataListeners]);
 
     const getCollectionRef = (name) => collection(db, `artifacts/${appId}/public/data/${name}`);
 
@@ -208,21 +236,23 @@ function App() {
     if (!user || authError) return <div className="flex flex-col items-center justify-center h-screen bg-gray-100 text-red-500"><AlertCircle className="w-12 h-12 mb-4"/>Authentication failed. Please refresh. <p className="text-sm mt-2">{authError}</p></div>;
 
     return (
-        <div className="bg-gray-50 font-sans min-h-screen"><div className="flex flex-col md:flex-row">
-            <aside className="w-full md:w-64 bg-white md:min-h-screen p-4 border-r border-gray-200 shadow-md">
-                <h1 className="text-2xl font-bold text-indigo-600 mb-6">BizFlow</h1>
-                <nav className="flex flex-row md:flex-col justify-around md:justify-start">
-                    <TabButton icon={<Euro/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<Users/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<Briefcase/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
-                    <TabButton icon={<FileText/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
+        <div className="bg-gray-50 font-sans min-h-screen">
+            <PullToRefreshIndicator isRefreshing={isRefreshing} pullPosition={pullPosition} />
+            <div className="flex flex-col md:flex-row">
+                <aside className="w-full md:w-64 bg-white p-2 md:p-4 border-b md:border-r md:border-b-0 border-gray-200 shadow-md">
+                    <h1 className="text-xl md:text-2xl font-bold text-indigo-600 mb-4 text-center md:text-left">BizFlow</h1>
+                <nav className="flex flex-row md:flex-col justify-center md:justify-start space-x-2 md:space-x-0 md:space-y-1">
+                    <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); }}/>
+                    <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); }}/>
+                    <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); }}/>
+                    <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); }}/>
                 </nav>
                 {user && <div className="mt-8 p-3 bg-indigo-50 rounded-lg hidden md:block"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
             </aside>
-            <main className="flex-1 p-4 md:p-8">
+            <main className="flex-1 p-2 sm:p-4 md:p-8">
                 {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice} onOpenSendModal={(type) => setModal({ type: 'send', data: { docType: type, job: selectedJob } })}/>)
                 : (<>
-                    <div className="flex justify-between items-center mb-6"><h2 className="text-3xl font-bold text-gray-800 capitalize">{activeTab}</h2><div>
+                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl md:text-3xl font-bold text-gray-800 capitalize">{activeTab}</h2><div>
                         {activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
                         {activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
                         {activeTab === 'dashboard' && <ActionButton icon={<Download />} label="Export Data" onClick={handleExport} />}
@@ -277,4 +307,172 @@ function JobDetailView({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice
 
     if (!editableJob) return <div className="flex items-center justify-center h-full"><Loader className="animate-spin mr-2"/>Loading job details...</div>;
 
-    return (<div><button onClick={onBack} className="mb-4 text-indigo-600 font-semibold hover:underline">← Back to Jobs</button><div className="bg-white rounded-lg shadow-lg p-6"><div className="flex justify-between items-start mb-4"><div><h2 className="text-2xl font-bold">{editableJob.jobTitle}</h2><p className="
+    return (
+        <div>
+            <button onClick={onBack} className="flex items-center mb-4 text-indigo-600 font-semibold hover:underline">
+                <ChevronLeft size={20} className="mr-1" />
+                Back to Jobs
+            </button>
+            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+                <div className="flex flex-col md:flex-row justify-between md:items-start mb-4 space-y-4 md:space-y-0">
+                    <div>
+                        <h2 className="text-xl sm:text-2xl font-bold">{editableJob.jobTitle}</h2>
+                        <p className="text-gray-500">{job.customer?.name}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto">
+                        <button onClick={handleSave} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center justify-center" disabled={isSaving}>
+                            <Save size={16} className="mr-2"/> {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        {!job.quote && <button onClick={() => onGenerateQuote(job)} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Generate Quote</button>}
+                        {job.quote && !job.invoice && <button onClick={() => onGenerateInvoice(job)} className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Generate Invoice</button>}
+                    </div>
+                </div>
+                <div className="mt-6">
+                    <div>
+                        <h3 className="text-lg font-bold">Labour</h3>
+                        {(editableJob.labour || []).map((l, i) => (
+                            <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
+                                <input type="text" placeholder="Description" value={l.description} onChange={e => handleItemChange('labour', i, 'description', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
+                                <input type="number" placeholder="Hours" value={l.hours} onChange={e => handleItemChange('labour', i, 'hours', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                                <input type="number" placeholder="Rate" value={l.rate} onChange={e => handleItemChange('labour', i, 'rate', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                                <button onClick={() => handleRemoveItem('labour', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
+                            </div>
+                        ))}
+                        <button onClick={() => handleAddItem('labour')} className="mt-2 text-indigo-600 flex items-center">
+                            <Plus size={16} className="mr-1" />Add Labour
+                        </button>
+                    </div>
+                    <div className="mt-4">
+                        <h3 className="text-lg font-bold">Materials</h3>
+                        {(editableJob.materials || []).map((m, i) => (
+                             <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
+                                <input type="text" placeholder="Name" value={m.name} onChange={e => handleItemChange('materials', i, 'name', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
+                                <input type="number" placeholder="Quantity" value={m.quantity} onChange={e => handleItemChange('materials', i, 'quantity', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                                <input type="number" placeholder="Cost" value={m.cost} onChange={e => handleItemChange('materials', i, 'cost', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                                <button onClick={() => handleRemoveItem('materials', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
+                            </div>
+                        ))}
+                        <button onClick={() => handleAddItem('materials')} className="mt-2 text-indigo-600 flex items-center">
+                            <Plus size={16} className="mr-1" />Add Material
+                        </button>
+                    </div>
+                </div>
+                <div className="mt-6 text-right">
+                    <p>Subtotal: {formatCurrency(editableJob.subTotal)}</p>
+                    <p>Tax ({editableJob.taxRate || 13.5}%): {formatCurrency(editableJob.taxAmount)}</p>
+                    <p className="font-bold text-lg">Total: {formatCurrency(editableJob.total)}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const TabButton = ({ icon, label, isActive, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`flex flex-col md:flex-row items-center justify-center flex-1 md:flex-initial md:justify-start w-full p-2 md:p-3 md:my-1 rounded-lg transition-colors ${
+            isActive ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
+        }`}
+    >
+        {icon}
+        <span className="mt-1 md:mt-0 md:ml-3 text-xs md:text-sm font-semibold">{label}</span>
+    </button>
+);
+
+const ActionButton = ({ icon, label, onClick }) => (
+    <button onClick={onClick} className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition-colors text-sm">
+        {icon}
+        <span className="ml-2 font-semibold">{label}</span>
+    </button>
+);
+
+const Modal = ({ children, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-2 sm:p-4">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm sm:max-w-md max-h-full overflow-y-auto">
+            <div className="p-4 border-b flex justify-end items-center">
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                    <X size={24} />
+                </button>
+            </div>
+            <div className="p-4">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
+const CustomerForm = ({ data, onSave, onClose }) => {
+    const [customer, setCustomer] = useState(data || { name: '', email: '', phone: '', address: '' });
+    const handleChange = (e) => setCustomer(p => ({ ...p, [e.target.name]: e.target.value }));
+    const handleSubmit = (e) => { e.preventDefault(); onSave(customer); };
+    return (
+        <form onSubmit={handleSubmit}>
+            <h3 className="text-lg font-semibold mb-4">{data ? 'Edit Customer' : 'New Customer'}</h3>
+            <div className="space-y-3">
+                <input name="name" value={customer.name} onChange={handleChange} placeholder="Name" className="w-full p-2 border rounded" required />
+                <input name="email" value={customer.email} onChange={handleChange} placeholder="Email" type="email" className="w-full p-2 border rounded" />
+                <input name="phone" value={customer.phone} onChange={handleChange} placeholder="Phone" className="w-full p-2 border rounded" />
+                <textarea name="address" value={customer.address} onChange={handleChange} placeholder="Address" className="w-full p-2 border rounded" rows="3" />
+            </div>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 space-y-2 space-y-reverse sm:space-y-0">
+                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save</button>
+                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto">Cancel</button>
+            </div>
+        </form>
+    );
+};
+
+const JobForm = ({ data, customers, onSave, onClose }) => {
+    const [job, setJob] = useState(data || { jobTitle: '', customerId: '', status: 'New' });
+    const handleChange = (e) => setJob(p => ({ ...p, [e.target.name]: e.target.value }));
+    const handleSubmit = (e) => { e.preventDefault(); onSave(job); };
+    return (
+        <form onSubmit={handleSubmit}>
+            <h3 className="text-lg font-semibold mb-4">{data ? 'Edit Job' : 'New Job'}</h3>
+            <div className="space-y-3">
+                <input name="jobTitle" value={job.jobTitle} onChange={handleChange} placeholder="Job Title" className="w-full p-2 border rounded" required />
+                <select name="customerId" value={job.customerId} onChange={handleChange} className="w-full p-2 border rounded" required>
+                    <option value="">Select Customer</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 space-y-2 space-y-reverse sm:space-y-0">
+                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save</button>
+                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto">Cancel</button>
+            </div>
+        </form>
+    );
+};
+
+const SendDocumentModal = ({ data, onClose }) => {
+    // Placeholder
+    return (
+        <div>
+            <h3 className="text-lg font-semibold mb-4">Send Document</h3>
+            <p>Sending functionality is not implemented in this version.</p>
+            <div className="mt-5 flex justify-end">
+                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Close</button>
+            </div>
+        </div>
+    );
+};
+
+const JobStatusBadge = ({ status }) => {
+    const statusConfig = {
+        New: 'bg-blue-100 text-blue-800',
+        Quoted: 'bg-yellow-100 text-yellow-800',
+        Invoiced: 'bg-purple-100 text-purple-800',
+        Paid: 'bg-green-100 text-green-800',
+    };
+    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[status] || 'bg-gray-100'}`}>{status}</span>;
+};
+
+const StatCard = ({ title, value, icon }) => (
+    <div className="bg-white p-4 rounded-lg shadow flex items-center">
+        <div className="mr-4">{icon}</div>
+        <div>
+            <p className="text-sm text-gray-500">{title}</p>
+            <p className="text-xl font-bold text-gray-800">{value}</p>
+        </div>
+    </div>
+);
