@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:android": "vite build && npx cap copy android",
+    "clean": "rimraf dist android/app/src/main/assets/public",
+    "build:android": "npm run clean && vite build && npx cap copy android",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.27",
+    "rimraf": "^6.0.1",
     "tailwindcss": "^3.3.3",
     "vite": "^4.4.5"
   }

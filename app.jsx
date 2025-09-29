@@ -17,13 +17,17 @@ import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "fire
 import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft, User, Menu } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { usePullToRefresh, PullToRefreshIndicator } from './hooks/usePullToRefresh';
 
-// --- MOCK CONFIG (WILL BE REPLACED BY HOSTING ENVIRONMENT) ---
-const firebaseConfig = typeof __firebase_config !== 'undefined'
-    ? JSON.parse(__firebase_config)
-    : { apiKey: "AIza...", authDomain: "...", projectId: "...", storageBucket: "...", messagingSenderId: "...", appId: "..." };
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// --- Firebase Configuration ---
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+const appId = import.meta.env.VITE_BMSYS_APP_ID || 'default-app-id';
 
 // --- Firebase Initialization ---
 const app = initializeApp(firebaseConfig);
@@ -113,43 +117,6 @@ function App() {
     const [isSaving, setIsSaving] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    const setupDataListeners = useCallback(() => {
-        if (!user) return () => {};
-
-        console.log("Setting up data listeners...");
-        const baseCollectionPath = `artifacts/${appId}/public/data`;
-        const ownerQuery = where("ownerId", "==", user.uid);
-
-        const unsubCustomers = onSnapshot(query(collection(db, `${baseCollectionPath}/customers`), ownerQuery), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubJobs = onSnapshot(query(collection(db, `${baseCollectionPath}/jobs`), ownerQuery), (snapshot) => {
-            const jobsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            jobsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            setJobs(jobsData);
-        });
-        const unsubQuotes = onSnapshot(query(collection(db, `${baseCollectionPath}/quotes`), ownerQuery), s => setQuotes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubInvoices = onSnapshot(query(collection(db, `${baseCollectionPath}/invoices`), ownerQuery), s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-        return () => {
-            console.log("Tearing down data listeners...");
-            unsubCustomers();
-            unsubJobs();
-            unsubQuotes();
-            unsubInvoices();
-        };
-    }, [user]);
-
-    const handleRefresh = async () => {
-        console.log("Refreshing data...");
-        const tearDown = setupDataListeners();
-        // We can add a small delay to give a better UX
-        await new Promise(res => setTimeout(res, 1000));
-        tearDown(); // Tear down old listeners
-        setupDataListeners(); // Set up new ones
-        console.log("Data refreshed!");
-    };
-
-    const { isRefreshing, pullPosition } = usePullToRefresh(handleRefresh);
-
     useEffect(() => {
         const authAction = async (token) => {
             try {
@@ -170,26 +137,57 @@ function App() {
     }, []);
 
     useEffect(() => {
-        const tearDown = setupDataListeners();
-        return () => tearDown();
-    }, [setupDataListeners]);
+        if (!user) return;
+        const baseCollectionPath = `artifacts/${appId}/public/data`;
+        const ownerQuery = where("ownerId", "==", user.uid);
+        const unsubCustomers = onSnapshot(query(collection(db, `${baseCollectionPath}/customers`), ownerQuery), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const unsubJobs = onSnapshot(query(collection(db, `${baseCollectionPath}/jobs`), ownerQuery), (snapshot) => {
+            const jobsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            jobsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            setJobs(jobsData);
+        });
+        const unsubQuotes = onSnapshot(query(collection(db, `${baseCollectionPath}/quotes`), ownerQuery), s => setQuotes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const unsubInvoices = onSnapshot(query(collection(db, `${baseCollectionPath}/invoices`), ownerQuery), s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        return () => {
+            unsubCustomers();
+            unsubJobs();
+            unsubQuotes();
+            unsubInvoices();
+        };
+    }, [user]);
 
     const getCollectionRef = (name) => collection(db, `artifacts/${appId}/public/data/${name}`);
 
     const handleSaveCustomer = async (customerData) => {
-        if (!user) return;
+        if (!user) {
+            console.error("Save failed: No user is authenticated.");
+            alert("Save failed: You are not logged in.");
+            return;
+        }
+        console.log("Attempting to save customer:", customerData);
         setIsSaving(true);
         try {
-            const customerWithOwnership = { ...customerData, ownerId: user.uid, lastUpdated: serverTimestamp() };
+            const customerWithOwnership = {
+                ...customerData,
+                ownerId: user.uid,
+                lastUpdated: serverTimestamp()
+            };
+
             if (customerData.id) {
+                console.log("Updating existing customer:", customerData.id);
                 await setDoc(doc(getCollectionRef('customers'), customerData.id), customerWithOwnership, { merge: true });
+                console.log("Customer updated successfully.");
             } else {
-                await addDoc(getCollectionRef('customers'), { ...customerWithOwnership, createdAt: serverTimestamp() });
+                console.log("Adding new customer...");
+                const payload = { ...customerWithOwnership, createdAt: serverTimestamp() };
+                const docRef = await addDoc(getCollectionRef('customers'), payload);
+                console.log("New customer added with ID:", docRef.id);
             }
+
             setModal(null);
         } catch (error) {
             console.error("Error saving customer:", error);
-            alert("Failed to save customer. Please try again.");
+            alert(`Failed to save customer. Error: ${error.message}`);
         } finally {
             setIsSaving(false);
         }
@@ -197,15 +195,22 @@ function App() {
 
     const handleSaveJob = async (jobData) => {
         if (!user) return;
-        const totals = calculateJobTotal(jobData);
-        const jobWithOwnership = { ...jobData, ...totals, ownerId: user.uid, lastUpdated: serverTimestamp() };
-        if (jobData.id) {
-            await updateDoc(doc(getCollectionRef('jobs'), jobData.id), jobWithOwnership);
-        } else {
-            const newJobRef = await addDoc(getCollectionRef('jobs'), { ...jobWithOwnership, status: 'New', createdAt: serverTimestamp() });
-            setSelectedJobId(newJobRef.id);
+        setIsSaving(true);
+        try {
+            const totals = calculateJobTotal(jobData);
+            const jobWithOwnership = { ...jobData, ...totals, ownerId: user.uid, lastUpdated: serverTimestamp() };
+            if (jobData.id) {
+                await updateDoc(doc(getCollectionRef('jobs'), jobData.id), jobWithOwnership);
+            } else {
+                const newJobRef = await addDoc(getCollectionRef('jobs'), { ...jobWithOwnership, status: 'New', createdAt: serverTimestamp() });
+                setSelectedJobId(newJobRef.id);
+            }
+        } catch (error) {
+            console.error("Error saving job:", error);
+            alert(`Failed to save job. Error: ${error.message}`);
+        } finally {
+            setIsSaving(false);
         }
-        setModal(null);
     };
 
     const handleGenerateQuote = async (job) => {
@@ -267,8 +272,6 @@ function App() {
 
     return (
         <div className="bg-gray-50 font-sans min-h-screen">
-            <PullToRefreshIndicator isRefreshing={isRefreshing} pullPosition={pullPosition} />
-
             <div className="flex flex-row">
                 {/* Unified Sidebar for Desktop */}
                 <aside className="hidden md:flex flex-col w-64 bg-white p-4 border-r border-gray-200 shadow-md">
@@ -287,7 +290,7 @@ function App() {
                     <button className="md:hidden p-2 mb-4" onClick={() => setIsMenuOpen(true)}>
                         <Menu size={24} />
                     </button>
-                    {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice} onOpenSendModal={(type) => setModal({ type: 'send', data: { docType: type, job: selectedJob } })}/>)
+                    {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice}/>)
                     : (<>
                         {activeTab === 'dashboard' && <DashboardView invoices={invoices} jobs={jobs} quotes={quotes} />}
                         {activeTab === 'customers' && <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>}
@@ -328,73 +331,90 @@ const CustomerListView = ({ customers, onEdit }) => (<div className="bg-white ro
 const JobListView = ({ jobs, customers, onSelectJob }) => (<div className="bg-white rounded-lg shadow p-6">{jobs.length>0?jobs.map(job=>(<div key={job.id} onClick={()=>onSelectJob(job.id)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md"><div className="flex justify-between items-center"><div><p className="font-bold text-gray-900">{job.jobTitle}</p><p className="text-sm text-gray-600">{customers.find(c=>c.id===job.customerId)?.name||'...'}</p></div><JobStatusBadge status={job.status}/></div></div>)):<p className="text-gray-500">No jobs found.</p>}</div>);
 const InvoiceListView = ({ invoices, jobs, customers, onUpdateStatus }) => (<div className="bg-white rounded-lg shadow p-6">{invoices.length>0?invoices.map(invoice=>{const job=jobs.find(j=>j.id===invoice.jobId);return(<div key={invoice.id} className="p-4 border-b last:border-b-0 flex justify-between items-center"><div><p className="font-bold">{invoice.invoiceNumber}</p><p className="text-sm text-gray-600">{job?.jobTitle} for {customers.find(c=>c.id===job?.customerId)?.name}</p><p className="text-sm font-semibold">{formatCurrency(invoice.invoiceData?.total||0)}</p></div><select value={invoice.status} onChange={(e)=>onUpdateStatus(invoice.id,e.target.value)} className={`p-2 rounded-md text-sm border-0 focus:ring-2 ${invoice.status==='Paid'?'bg-green-100 text-green-800 focus:ring-green-500':'bg-red-100 text-red-800 focus:ring-red-500'}`}><option value="Unpaid">Unpaid</option><option value="Paid">Paid</option></select></div>)}):<p className="text-gray-500">No invoices yet.</p>}</div>);
 
-function JobDetailView({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice, onOpenSendModal }) {
+function JobDetailView({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice }) {
     const [editableJob, setEditableJob] = useState(job);
     const [isSaving, setIsSaving] = useState(false);
-    useEffect(() => { setEditableJob(job); }, [job]);
+
+    useEffect(() => {
+        setEditableJob({ ...job, ...calculateJobTotal(job) });
+    }, [job]);
+
     const handleFieldChange = (field, value) => setEditableJob(p => ({...p, [field]: value}));
-    const handleItemChange = (type, i, field, value) => setEditableJob(p => ({ ...p, [type]: p[type].map((item, idx) => idx === i ? { ...item, [field]: value } : item) }));
+    const handleItemChange = (type, i, field, value) => {
+        const updatedItems = editableJob[type].map((item, idx) => idx === i ? { ...item, [field]: value } : item);
+        setEditableJob(prev => ({ ...prev, [type]: updatedItems }));
+    };
     const handleAddItem = (type) => setEditableJob(p => ({ ...p, [type]: [...(p[type] || []), type === 'labour' ? { description: '', hours: 1, rate: 50 } : { name: '', quantity: 1, cost: 10 }] }));
     const handleRemoveItem = (type, i) => setEditableJob(p => ({ ...p, [type]: p[type].filter((_, idx) => idx !== i) }));
-    const handleSave = async () => { setIsSaving(true); await onSave(editableJob); setIsSaving(false); };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        await onSave(editableJob);
+        setIsSaving(false);
+    };
+
+    useEffect(() => {
+        if (editableJob) {
+            const totals = calculateJobTotal(editableJob);
+            if (totals.total !== editableJob.total || totals.subTotal !== editableJob.subTotal) {
+                setEditableJob(prev => ({ ...prev, ...totals }));
+            }
+        }
+    }, [editableJob?.labour, editableJob?.materials, editableJob?.taxRate]);
 
     if (!editableJob) return <div className="flex items-center justify-center h-full"><Loader className="animate-spin mr-2"/>Loading job details...</div>;
 
     return (
-        <div>
-            <button onClick={onBack} className="flex items-center mb-4 text-indigo-600 font-semibold hover:underline">
-                <ChevronLeft size={20} className="mr-1" />
-                Back to Jobs
-            </button>
-            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
-                <div className="flex flex-col md:flex-row justify-between md:items-start mb-4 space-y-4 md:space-y-0">
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-bold">{editableJob.jobTitle}</h2>
-                        <p className="text-gray-500">{job.customer?.name}</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto">
-                        <button onClick={handleSave} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center justify-center" disabled={isSaving}>
-                            <Save size={16} className="mr-2"/> {isSaving ? 'Saving...' : 'Save'}
-                        </button>
-                        {!job.quote && <button onClick={() => onGenerateQuote(job)} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Generate Quote</button>}
-                        {job.quote && !job.invoice && <button onClick={() => onGenerateInvoice(job)} className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Generate Invoice</button>}
-                    </div>
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+            <div className="flex flex-col md:flex-row justify-between md:items-start mb-4 space-y-4 md:space-y-0">
+                <div>
+                    <h2 className="text-xl sm:text-2xl font-bold">{editableJob.jobTitle}</h2>
+                    <p className="text-gray-500">{job.customer?.name}</p>
                 </div>
-                <div className="mt-6">
-                    <div>
-                        <h3 className="text-lg font-bold">Labour</h3>
-                        {(editableJob.labour || []).map((l, i) => (
-                            <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
-                                <input type="text" placeholder="Description" value={l.description} onChange={e => handleItemChange('labour', i, 'description', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
-                                <input type="number" placeholder="Hours" value={l.hours} onChange={e => handleItemChange('labour', i, 'hours', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                                <input type="number" placeholder="Rate" value={l.rate} onChange={e => handleItemChange('labour', i, 'rate', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                                <button onClick={() => handleRemoveItem('labour', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
-                            </div>
-                        ))}
-                        <button onClick={() => handleAddItem('labour')} className="mt-2 text-indigo-600 flex items-center">
-                            <Plus size={16} className="mr-1" />Add Labour
-                        </button>
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-lg font-bold">Materials</h3>
-                        {(editableJob.materials || []).map((m, i) => (
-                             <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
-                                <input type="text" placeholder="Name" value={m.name} onChange={e => handleItemChange('materials', i, 'name', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
-                                <input type="number" placeholder="Quantity" value={m.quantity} onChange={e => handleItemChange('materials', i, 'quantity', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                                <input type="number" placeholder="Cost" value={m.cost} onChange={e => handleItemChange('materials', i, 'cost', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                                <button onClick={() => handleRemoveItem('materials', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
-                            </div>
-                        ))}
-                        <button onClick={() => handleAddItem('materials')} className="mt-2 text-indigo-600 flex items-center">
-                            <Plus size={16} className="mr-1" />Add Material
-                        </button>
-                    </div>
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto">
+                    <ActionButton icon={<Save size={16}/>} label={isSaving ? 'Saving...' : 'Save Job'} onClick={handleSave} disabled={isSaving}/>
+                    {!job.quote && <ActionButton icon={<FileText size={16}/>} label="Generate Quote" onClick={() => onGenerateQuote(job)}/>}
+                    {job.quote && !job.invoice && <ActionButton icon={<FileText size={16}/>} label="Generate Invoice" onClick={() => onGenerateInvoice(job)}/>}
+                    <button onClick={onBack} className="flex items-center justify-center w-full sm:w-auto px-4 py-2 rounded-md hover:bg-gray-100">
+                        <ChevronLeft size={16} className="mr-1"/>
+                        Back
+                    </button>
                 </div>
-                <div className="mt-6 text-right">
-                    <p>Subtotal: {formatCurrency(editableJob.subTotal)}</p>
-                    <p>Tax ({editableJob.taxRate || 13.5}%): {formatCurrency(editableJob.taxAmount)}</p>
-                    <p className="font-bold text-lg">Total: {formatCurrency(editableJob.total)}</p>
+            </div>
+            <div className="mt-6">
+                <div>
+                    <h3 className="text-lg font-bold">Labour</h3>
+                    {(editableJob.labour || []).map((l, i) => (
+                        <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
+                            <input type="text" placeholder="Description" value={l.description} onChange={e => handleItemChange('labour', i, 'description', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
+                            <input type="number" placeholder="Hours" value={l.hours} onChange={e => handleItemChange('labour', i, 'hours', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                            <input type="number" placeholder="Rate" value={l.rate} onChange={e => handleItemChange('labour', i, 'rate', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                            <button onClick={() => handleRemoveItem('labour', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
+                        </div>
+                    ))}
+                    <button onClick={() => handleAddItem('labour')} className="mt-2 text-indigo-600 flex items-center">
+                        <Plus size={16} className="mr-1" />Add Labour
+                    </button>
                 </div>
+                <div className="mt-4">
+                    <h3 className="text-lg font-bold">Materials</h3>
+                    {(editableJob.materials || []).map((m, i) => (
+                         <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
+                            <input type="text" placeholder="Name" value={m.name} onChange={e => handleItemChange('materials', i, 'name', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
+                            <input type="number" placeholder="Quantity" value={m.quantity} onChange={e => handleItemChange('materials', i, 'quantity', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                            <input type="number" placeholder="Cost" value={m.cost} onChange={e => handleItemChange('materials', i, 'cost', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
+                            <button onClick={() => handleRemoveItem('materials', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
+                        </div>
+                    ))}
+                    <button onClick={() => handleAddItem('materials')} className="mt-2 text-indigo-600 flex items-center">
+                        <Plus size={16} className="mr-1" />Add Material
+                    </button>
+                </div>
+            </div>
+            <div className="mt-6 text-right">
+                <p>Subtotal: {formatCurrency(editableJob.subTotal)}</p>
+                <p>Tax ({editableJob.taxRate || 13.5}%): {formatCurrency(editableJob.taxAmount)}</p>
+                <p className="font-bold text-lg">Total: {formatCurrency(editableJob.total)}</p>
             </div>
         </div>
     );
