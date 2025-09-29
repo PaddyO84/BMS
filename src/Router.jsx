@@ -51,8 +51,8 @@ const AppRouter = ({
                     }
                 >
                     <Route index element={<DashboardView jobs={jobs} />} />
-                    <Route path="customers" element={<CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })} />} />
-                    <Route path="jobs" element={<JobListView jobs={jobs} customers={customers} />} />
+                    <Route path="customers" element={<CustomerListView customers={customers} setModal={setModal} />} />
+                    <Route path="jobs" element={<JobListView jobs={jobs} customers={customers} setModal={setModal} />} />
                     <Route path="jobs/:id" element={<JobDetailWrapper />} />
                     <Route path="profile" element={<ProfileView profile={profile} onSave={onSaveProfile} />} />
                 </Route>

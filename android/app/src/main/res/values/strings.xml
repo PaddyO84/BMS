@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BMSys</string>
-    <string name="title_activity_main">BMSys</string>
+    <string name="app_name">ClearPath</string>
+    <string name="title_activity_main">ClearPath</string>
     <string name="package_name">com.bmsys.app</string>
     <string name="custom_url_scheme">com.bmsys.app</string>
 </resources>

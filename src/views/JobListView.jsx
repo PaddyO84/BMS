@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase } from 'lucide-react';
+import FloatingActionButton from '../components/FloatingActionButton';
 
 const JobStatusBadge = ({ status }) => {
     const statusClasses = {
@@ -18,7 +19,7 @@ const JobStatusBadge = ({ status }) => {
     );
 };
 
-const JobListView = ({ jobs, customers }) => {
+const JobListView = ({ jobs, customers, setModal }) => {
     const navigate = useNavigate();
     const customerMap = React.useMemo(() => 
         customers.reduce((acc, c) => {
@@ -27,28 +28,31 @@ const JobListView = ({ jobs, customers }) => {
         }, {}), [customers]);
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6">
-                {jobs.length > 0 ? (
-                    jobs.map(job => (
-                        <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md transition-colors">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-bold text-gray-900">{job.jobTitle}</p>
-                                    <p className="text-sm text-gray-600">{customerMap[job.customerId] || '...'}</p>
+        <div>
+            <div className="bg-white rounded-lg shadow">
+                <div className="p-6">
+                    {jobs.length > 0 ? (
+                        jobs.map(job => (
+                            <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold text-gray-900">{job.jobTitle}</p>
+                                        <p className="text-sm text-gray-600">{customerMap[job.customerId] || '...'}</p>
+                                    </div>
+                                    <JobStatusBadge status={job.status}/>
                                 </div>
-                                <JobStatusBadge status={job.status}/>
                             </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-12 text-gray-500">
+                            <Briefcase size={48} className="mx-auto mb-4" />
+                            <h3 className="text-xl font-semibold mb-2">No jobs found.</h3>
+                            <p>Create a new job to begin.</p>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <Briefcase size={48} className="mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold mb-2">No jobs found.</h3>
-                        <p>Create a new job to begin.</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
+            <FloatingActionButton onClick={() => setModal({ type: 'job' })} />
         </div>
     );
 };

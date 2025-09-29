@@ -1,6 +1,6 @@
 {
   "appId": "com.bmsys.app",
-  "appName": "BMSys",
+  "appName": "ClearPath",
   "webDir": "dist",
   "bundledWebRuntime": false
 }

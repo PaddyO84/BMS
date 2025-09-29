@@ -1,13 +1,13 @@
 {
-  "name": "bms-mobile-complete",
+  "name": "clear-path",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "mkdir -p public/assets && cp node_modules/sql.js/dist/sql-wasm.wasm public/assets/ && vite build",
     "clean": "rimraf dist android/app/src/main/assets/public",
-    "build:android": "npm run clean && vite build && npx cap copy android",
+    "build:android": "npm run clean && npm run build && npx cap copy android",
     "preview": "vite preview"
   },
   "dependencies": {
