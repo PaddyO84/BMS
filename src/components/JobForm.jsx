@@ -9,13 +9,13 @@ const JobForm = ({ data, customers, onSave, onClose }) => {
         setJob(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!job.customerId) {
             alert("Please select a customer.");
             return;
         }
-        onSave(job);
+        await onSave(job);
     };
 
     return (

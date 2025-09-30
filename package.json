@@ -11,23 +11,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor-community/sqlite": "^5.7.2",
-    "@capacitor/android": "^5.7.4",
-    "@capacitor/app": "^5.0.7",
-    "@capacitor/camera": "^5.0.9",
-    "@capacitor/core": "^5.7.4",
-    "@capacitor/filesystem": "^5.2.1",
-    "@capacitor/share": "^5.0.7",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.5.28",
+    "@capacitor-community/sqlite": "^7.0.1",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/camera": "^7.0.2",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/filesystem": "^7.1.4",
+    "@capacitor/share": "^7.0.2",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.395.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.24.0",
-    "use-pull-to-refresh": "^2.4.1"
+    "react-router-dom": "^6.24.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^5.7.4",
+    "@capacitor/cli": "^7.4.3",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
@@ -37,6 +36,6 @@
     "postcss": "^8.4.27",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.3.3",
-    "vite": "^4.4.5"
+    "vite": "^7.1.7"
   }
 }

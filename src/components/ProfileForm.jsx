@@ -33,9 +33,9 @@ const ProfileForm = ({ profile, onSave }) => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onSave(formData);
+        await onSave(formData);
     };
 
     return (
