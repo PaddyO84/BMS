@@ -71,8 +71,8 @@ function App() {
         } else {
             await db.addCustomer(customerData);
         }
-        setModal(null);
         await fetchData();
+        setModal(null);
     };
 
     const handleSaveJob = async (jobData) => {
@@ -84,8 +84,8 @@ function App() {
         } else {
             newJobId = await db.addJob(jobData);
         }
-        setModal(null);
         await fetchData();
+        setModal(null);
         return newJobId;
     };
 
