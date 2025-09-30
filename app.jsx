@@ -1,189 +1,31 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import {
-    getFirestore,
-    doc,
-    setDoc,
-    addDoc,
-    collection,
-    query,
-    where,
-    onSnapshot,
-    updateDoc,
-    serverTimestamp
-} from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { Plus, X, Users, Briefcase, FileText, Euro, Edit, Trash2, Camera, Mail, MessageSquare, ChevronDown, ChevronUp, Download, Loader, AlertCircle, Save, ChevronLeft, User, Menu } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-const appId = import.meta.env.VITE_BMSYS_APP_ID || 'default-app-id';
-
-// --- Firebase Initialization ---
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-// --- HELPER FUNCTIONS ---
-const formatCurrency = (amount) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(amount || 0);
-const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toLocaleDateString('en-GB');
-    return new Date(timestamp).toLocaleDateString('en-GB');
-};
-
-// --- PDF Generation ---
-const generatePdf = (docType, data) => {
-    const doc = new jsPDF();
-    const { number, job, customer, issueDate, dueDate } = data;
-    doc.setFontSize(20); doc.text(docType.toUpperCase(), 15, 20);
-    doc.setFontSize(10); doc.text("Your Business Name", 150, 15); doc.text("123 Business Road, Dublin", 150, 20); doc.text("your.email@business.com", 150, 25);
-    doc.setFontSize(12); doc.text(`${docType} Number: ${number}`, 15, 40); doc.text(`Date of Issue: ${issueDate}`, 15, 46);
-    if(dueDate) doc.text(`Due Date: ${dueDate}`, 15, 52);
-    doc.text("Bill To:", 15, 65); doc.text(customer?.name || "N/A", 15, 71); doc.text(customer?.address || "N/A", 15, 77); doc.text(customer?.email || "N/A", 15, 83);
-    const head = [['Description', 'Quantity/Hours', 'Unit Price', 'Total']];
-    const labourBody = (job.labour || []).map(l => [l.description, `${l.hours} hrs`, formatCurrency(l.rate), formatCurrency(l.hours * l.rate)]);
-    const materialsBody = (job.materials || []).map(m => [m.name, m.quantity, formatCurrency(m.cost), formatCurrency(m.quantity * m.cost)]);
-    doc.autoTable({ startY: 95, head, body: [...labourBody, ...materialsBody], theme: 'striped', headStyles: { fillColor: [41, 128, 185] } });
-    const finalY = doc.autoTable.previous.finalY;
-    const totals = calculateJobTotal(job);
-    doc.setFontSize(12); doc.text(`Subtotal:`, 140, finalY + 10, { align: 'right' }); doc.text(formatCurrency(totals.subTotal), 200, finalY + 10, { align: 'right' });
-    doc.text(`VAT @ ${totals.taxRate}%:`, 140, finalY + 17, { align: 'right' }); doc.text(formatCurrency(totals.taxAmount), 200, finalY + 17, { align: 'right' });
-    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(`Total:`, 140, finalY + 25, { align: 'right' }); doc.text(formatCurrency(totals.total), 200, finalY + 25, { align: 'right' });
-    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.text("Thank you for your business!", 15, doc.internal.pageSize.height - 10);
-    doc.save(`${docType}_${number}.pdf`);
-};
-
-const calculateJobTotal = (job) => {
-    if (!job) return { subTotal: 0, taxAmount: 0, total: 0, taxRate: 13.5 };
-    const labourTotal = job.labour?.reduce((sum, item) => sum + ((item.hours || 0) * (item.rate || 0)), 0) || 0;
-    const materialsTotal = job.materials?.reduce((sum, item) => sum + ((item.quantity || 0) * (item.cost || 0)), 0) || 0;
-    const subTotal = labourTotal + materialsTotal;
-    const taxRate = job.taxRate || 13.5;
-    const taxAmount = subTotal * (taxRate / 100);
-    const total = subTotal + taxAmount;
-    return { subTotal, taxAmount, total, taxRate };
-};
-
-// --- Error Boundary Component ---
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center h-screen bg-red-50 text-red-700 p-4">
-          <AlertCircle className="w-16 h-16 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Something went wrong.</h1>
-          <p className="text-center">The application encountered an error. Please try refreshing the page.</p>
-          <pre className="mt-4 p-2 bg-red-100 text-xs rounded-md w-full max-w-lg overflow-auto">
-            {this.state.error && this.state.error.toString()}
-          </pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import React, { useState, useMemo } from 'react';
+import { useDatabase } from './hooks/useDatabase';
+import { Plus, Loader, AlertCircle } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import BottomNavBar from './components/BottomNavBar';
+import { CustomerForm, JobForm } from './components/forms';
+import { Modal, ActionButton } from './components/ui';
+import CustomerListView from './views/CustomerListView';
+import JobListView from './views/JobListView';
+import JobDetailView from './views/JobDetailView';
+import ProfileView from './views/ProfileView';
 
 // --- MAIN APP COMPONENT ---
 function App() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [authError, setAuthError] = useState(null);
-    const [activeTab, setActiveTab] = useState('dashboard');
-    const [customers, setCustomers] = useState([]);
-    const [jobs, setJobs] = useState([]);
-    const [quotes, setQuotes] = useState([]);
-    const [invoices, setInvoices] = useState([]);
+    const { loading, customers, jobs, profile, addCustomer, updateCustomer, addJob, updateJob, updateBusinessProfile } = useDatabase();
+    const [activeTab, setActiveTab] = useState('jobs');
     const [modal, setModal] = useState(null);
     const [selectedJobId, setSelectedJobId] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    useEffect(() => {
-        const authAction = async (token) => {
-            try {
-                if (token) await signInWithCustomToken(auth, token);
-                else await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Authentication Error:", error);
-                setAuthError(error.message);
-            }
-        };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        authAction(initialAuthToken);
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-        if (!user) return;
-        const baseCollectionPath = `artifacts/${appId}/public/data`;
-        const ownerQuery = where("ownerId", "==", user.uid);
-        const unsubCustomers = onSnapshot(query(collection(db, `${baseCollectionPath}/customers`), ownerQuery), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubJobs = onSnapshot(query(collection(db, `${baseCollectionPath}/jobs`), ownerQuery), (snapshot) => {
-            const jobsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            jobsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            setJobs(jobsData);
-        });
-        const unsubQuotes = onSnapshot(query(collection(db, `${baseCollectionPath}/quotes`), ownerQuery), s => setQuotes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubInvoices = onSnapshot(query(collection(db, `${baseCollectionPath}/invoices`), ownerQuery), s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        return () => {
-            unsubCustomers();
-            unsubJobs();
-            unsubQuotes();
-            unsubInvoices();
-        };
-    }, [user]);
-
-    const getCollectionRef = (name) => collection(db, `artifacts/${appId}/public/data/${name}`);
 
     const handleSaveCustomer = async (customerData) => {
-        if (!user) {
-            console.error("Save failed: No user is authenticated.");
-            alert("Save failed: You are not logged in.");
-            return;
-        }
-        console.log("Attempting to save customer:", customerData);
         setIsSaving(true);
         try {
-            const customerWithOwnership = {
-                ...customerData,
-                ownerId: user.uid,
-                lastUpdated: serverTimestamp()
-            };
-
             if (customerData.id) {
-                console.log("Updating existing customer:", customerData.id);
-                await setDoc(doc(getCollectionRef('customers'), customerData.id), customerWithOwnership, { merge: true });
-                console.log("Customer updated successfully.");
+                await updateCustomer(customerData);
             } else {
-                console.log("Adding new customer...");
-                const payload = { ...customerWithOwnership, createdAt: serverTimestamp() };
-                const docRef = await addDoc(getCollectionRef('customers'), payload);
-                console.log("New customer added with ID:", docRef.id);
+                await addCustomer(customerData);
             }
-
             setModal(null);
         } catch (error) {
             console.error("Error saving customer:", error);
@@ -194,17 +36,15 @@ function App() {
     };
 
     const handleSaveJob = async (jobData) => {
-        if (!user) return;
         setIsSaving(true);
         try {
-            const totals = calculateJobTotal(jobData);
-            const jobWithOwnership = { ...jobData, ...totals, ownerId: user.uid, lastUpdated: serverTimestamp() };
             if (jobData.id) {
-                await updateDoc(doc(getCollectionRef('jobs'), jobData.id), jobWithOwnership);
+                await updateJob(jobData);
             } else {
-                const newJobRef = await addDoc(getCollectionRef('jobs'), { ...jobWithOwnership, status: 'New', createdAt: serverTimestamp() });
-                setSelectedJobId(newJobRef.id);
+                const newJobId = await addJob({ ...jobData, status: 'New' });
+                setSelectedJobId(newJobId);
             }
+            setModal(null);
         } catch (error) {
             console.error("Error saving job:", error);
             alert(`Failed to save job. Error: ${error.message}`);
@@ -213,323 +53,65 @@ function App() {
         }
     };
 
-    const handleGenerateQuote = async (job) => {
-        if (!user) return;
-        await addDoc(getCollectionRef('quotes'), { ownerId: user.uid, jobId: job.id, quoteNumber: `QT-2025-${String(quotes.length + 1).padStart(3, '0')}`, status: "Draft", createdAt: serverTimestamp(), quoteData: job });
-        await updateDoc(doc(getCollectionRef('jobs'), job.id), { status: 'Quoted' });
-    };
-
-    const handleGenerateInvoice = async (job) => {
-        if (!user) return;
-        await addDoc(getCollectionRef('invoices'), { ownerId: user.uid, jobId: job.id, invoiceNumber: `INV-2025-${String(invoices.length + 1).padStart(3, '0')}`, status: "Unpaid", createdAt: serverTimestamp(), invoiceData: job });
-        await updateDoc(doc(getCollectionRef('jobs'), job.id), { status: 'Invoiced' });
-    };
-
-    const handleUpdateInvoiceStatus = async (invoiceId, status) => await updateDoc(doc(getCollectionRef('invoices'), invoiceId), { status });
-    const handleExport = () => {
-        if (jobs.length === 0) {
-            const customModal = document.createElement('div');
-            customModal.innerHTML = `<div style="position:fixed; top:20px; left:50%; transform:translateX(-50%); background-color: #fefcbf; color: #744210; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index:100;">No data to export.</div>`;
-            document.body.appendChild(customModal);
-            setTimeout(() => document.body.removeChild(customModal), 3000);
-            return;
-         }
-        const data = jobs.map(job => ({ jobId: job.id, jobTitle: job.jobTitle, customerName: customers.find(c=>c.id === job.customerId)?.name || 'N/A', status: job.status, totalCost: calculateJobTotal(job).total, invoiceNumber: invoices.find(i=>i.jobId === job.id)?.invoiceNumber || 'N/A', invoiceStatus: invoices.find(i=>i.jobId === job.id)?.status || 'N/A', date: formatDate(job.createdAt) }));
-        const csv = [Object.keys(data[0]).join(','), ...data.map(row => Object.values(row).join(','))].join('\n');
-        const link = Object.assign(document.createElement("a"), { href: 'data:text/csv;charset=utf-8,' + encodeURI(csv), download: "bizflow_accounting_export.csv" });
-        document.body.appendChild(link).click(); document.body.removeChild(link);
-    };
-
     const selectedJob = useMemo(() => {
         if (!selectedJobId) return null;
         const job = jobs.find(j => j.id === selectedJobId);
-        if(!job) return null;
-        return { ...job, ...calculateJobTotal(job), customer: customers.find(c => c.id === job.customerId), quote: quotes.find(q => q.jobId === job.id), invoice: invoices.find(i => i.jobId === job.id) };
-    }, [selectedJobId, jobs, customers, quotes, invoices]);
+        if (!job) return null;
+        return { ...job, customer: customers.find(c => c.id === job.customerId) };
+    }, [selectedJobId, jobs, customers]);
 
-    const SidebarContent = () => (
-        <div className="flex flex-col h-full">
-            <h1 className="text-2xl font-bold text-indigo-600 mb-6">BizFlow</h1>
-            <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800 capitalize mb-4">{activeTab}</h2>
-                {activeTab === 'customers' && <ActionButton icon={<Plus/>} label="New Customer" onClick={() => setModal({ type: 'customer' })}/>}
-                {activeTab === 'jobs' && <ActionButton icon={<Plus/>} label="New Job" onClick={() => setModal({ type: 'job' })}/>}
-                {activeTab === 'dashboard' && <ActionButton icon={<Download />} label="Export Data" onClick={handleExport} />}
-            </div>
-            <nav className="flex flex-col space-y-1">
-                <TabButton icon={<Euro size={20}/>} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                <TabButton icon={<Users size={20}/>} label="Customers" isActive={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                <TabButton icon={<Briefcase size={20}/>} label="Jobs" isActive={activeTab === 'jobs'} onClick={() => { setActiveTab('jobs'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                <TabButton icon={<FileText size={20}/>} label="Invoices" isActive={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-                <TabButton icon={<User size={20}/>} label="Profile" isActive={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setSelectedJobId(null); setIsMenuOpen(false); }}/>
-            </nav>
-            {user && <div className="mt-auto p-3 bg-indigo-50 rounded-lg"><p className="text-xs text-gray-600">Your User ID:</p><p className="text-xs font-mono text-indigo-800 break-all">{user.uid}</p></div>}
-        </div>
-    );
+    const renderContent = () => {
+        if (selectedJobId) {
+            return <JobDetailView
+                key={selectedJobId}
+                job={selectedJob}
+                onBack={() => setSelectedJobId(null)}
+                onSave={handleSaveJob}
+                isSaving={isSaving}
+                profile={profile}
+            />
+        }
+        switch (activeTab) {
+            case 'customers':
+                return <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })} />;
+            case 'jobs':
+                return <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId} />;
+            case 'profile':
+                return <ProfileView profile={profile} onSave={updateBusinessProfile} isSaving={isSaving} />;
+            default:
+                return <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId} />;
+        }
+    }
 
-    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><Loader className="animate-spin mr-2"/>Loading Business Manager...</div>;
-    if (!user || authError) return <div className="flex flex-col items-center justify-center h-screen bg-gray-100 text-red-500"><AlertCircle className="w-12 h-12 mb-4"/>Authentication failed. Please refresh. <p className="text-sm mt-2">{authError}</p></div>;
+    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><Loader className="animate-spin mr-2" />Loading Business Manager...</div>;
 
     return (
-        <div className="bg-gray-50 font-sans min-h-screen">
-            <div className="flex flex-row">
-                {/* Unified Sidebar for Desktop */}
-                <aside className="hidden md:flex flex-col w-64 bg-white p-4 border-r border-gray-200 shadow-md">
-                    <SidebarContent />
-                </aside>
+        <div className="bg-gray-50 font-sans min-h-screen flex flex-col">
+            <header className="bg-white shadow-md p-4 flex justify-between items-center md:hidden">
+                <h1 className="text-xl font-bold text-indigo-600 capitalize">{activeTab}</h1>
+                {activeTab === 'customers' && <ActionButton icon={<Plus size={16} />} label="New" onClick={() => setModal({ type: 'customer' })} />}
+                {activeTab === 'jobs' && <ActionButton icon={<Plus size={16} />} label="New" onClick={() => setModal({ type: 'job', data: { customerId: customers[0]?.id } })} />}
+            </header>
 
-                {/* Mobile Menu Overlay & Sidebar */}
-                <div className={`md:hidden fixed inset-0 z-50 transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                    <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setIsMenuOpen(false)}></div>
-                    <div className="relative w-64 bg-white h-full shadow-lg p-4">
-                        <SidebarContent />
-                    </div>
-                </div>
+            <main className="flex-1 p-4 mb-16">
+                {renderContent()}
+            </main>
 
-                <main className="flex-1 p-2 sm:p-4 md:p-8 relative">
-                    <button className="md:hidden p-2 mb-4" onClick={() => setIsMenuOpen(true)}>
-                        <Menu size={24} />
-                    </button>
-                    {selectedJobId ? (<JobDetailView key={selectedJobId} job={selectedJob} onBack={() => setSelectedJobId(null)} onSave={handleSaveJob} onGenerateQuote={handleGenerateQuote} onGenerateInvoice={handleGenerateInvoice}/>)
-                    : (<>
-                        {activeTab === 'dashboard' && <DashboardView invoices={invoices} jobs={jobs} quotes={quotes} />}
-                        {activeTab === 'customers' && <CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })}/>}
-                        {activeTab === 'jobs' && <JobListView jobs={jobs} customers={customers} onSelectJob={setSelectedJobId}/>}
-                        {activeTab === 'invoices' && <InvoiceListView invoices={invoices} jobs={jobs} customers={customers} onUpdateStatus={handleUpdateInvoiceStatus} />}
-                    </>)}
-                </main>
-            </div>
+            <BottomNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+
             {modal && <Modal onClose={() => setModal(null)}>
                 {modal.type === 'customer' && <CustomerForm data={modal.data} onSave={handleSaveCustomer} onClose={() => setModal(null)} isSaving={isSaving} />}
-                {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)}/>}
-                {modal.type === 'send' && <SendDocumentModal data={modal.data} onClose={() => setModal(null)}/>}
+                {modal.type === 'job' && <JobForm data={modal.data} customers={customers} onSave={handleSaveJob} onClose={() => setModal(null)} isSaving={isSaving} />}
             </Modal>}
         </div>
     );
 }
 
-// Wrap App in ErrorBoundary for production
+// Wrap App in ErrorBoundary
 export default function AppWrapper() {
-  return (
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
-}
-
-// --- VIEWS / COMPONENTS ---
-const DashboardView = ({ invoices, jobs, quotes }) => {
-    const unpaidInvoices = invoices.filter(i => i.status === 'Unpaid');
-    const totalOwed = unpaidInvoices.reduce((sum, inv) => sum + (inv.invoiceData?.total || 0), 0);
-    return (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Total Owed" value={formatCurrency(totalOwed)} icon={<Euro className="text-green-500"/>} />
-        <StatCard title="Active Jobs" value={jobs.filter(j => ['New', 'Quoted', 'Approved', 'In Progress'].includes(j.status)).length} icon={<Briefcase className="text-blue-500"/>} />
-        <StatCard title="Pending Quotes" value={quotes.filter(q => ['Sent', 'Draft'].includes(q.status)).length} icon={<FileText className="text-yellow-500"/>} />
-    </div>);
-};
-const CustomerListView = ({ customers, onEdit }) => (<div className="bg-white rounded-lg shadow p-6">{customers.length>0?customers.map(c=>(<div key={c.id} className="flex justify-between items-center p-3 border-b last:border-b-0 hover:bg-gray-50 rounded-md"><div><p className="font-semibold text-gray-800">{c.name}</p><p className="text-sm text-gray-500">{c.email} | {c.phone}</p></div><button onClick={()=>onEdit(c)} className="text-gray-400 hover:text-indigo-600"><Edit size={18}/></button></div>)):<p className="text-gray-500">No customers found.</p>}</div>);
-const JobListView = ({ jobs, customers, onSelectJob }) => (<div className="bg-white rounded-lg shadow p-6">{jobs.length>0?jobs.map(job=>(<div key={job.id} onClick={()=>onSelectJob(job.id)} className="p-4 border-b last:border-b-0 hover:bg-indigo-50 cursor-pointer rounded-md"><div className="flex justify-between items-center"><div><p className="font-bold text-gray-900">{job.jobTitle}</p><p className="text-sm text-gray-600">{customers.find(c=>c.id===job.customerId)?.name||'...'}</p></div><JobStatusBadge status={job.status}/></div></div>)):<p className="text-gray-500">No jobs found.</p>}</div>);
-const InvoiceListView = ({ invoices, jobs, customers, onUpdateStatus }) => (<div className="bg-white rounded-lg shadow p-6">{invoices.length>0?invoices.map(invoice=>{const job=jobs.find(j=>j.id===invoice.jobId);return(<div key={invoice.id} className="p-4 border-b last:border-b-0 flex justify-between items-center"><div><p className="font-bold">{invoice.invoiceNumber}</p><p className="text-sm text-gray-600">{job?.jobTitle} for {customers.find(c=>c.id===job?.customerId)?.name}</p><p className="text-sm font-semibold">{formatCurrency(invoice.invoiceData?.total||0)}</p></div><select value={invoice.status} onChange={(e)=>onUpdateStatus(invoice.id,e.target.value)} className={`p-2 rounded-md text-sm border-0 focus:ring-2 ${invoice.status==='Paid'?'bg-green-100 text-green-800 focus:ring-green-500':'bg-red-100 text-red-800 focus:ring-red-500'}`}><option value="Unpaid">Unpaid</option><option value="Paid">Paid</option></select></div>)}):<p className="text-gray-500">No invoices yet.</p>}</div>);
-
-function JobDetailView({ job, onBack, onSave, onGenerateQuote, onGenerateInvoice }) {
-    const [editableJob, setEditableJob] = useState(job);
-    const [isSaving, setIsSaving] = useState(false);
-
-    useEffect(() => {
-        setEditableJob({ ...job, ...calculateJobTotal(job) });
-    }, [job]);
-
-    const handleFieldChange = (field, value) => setEditableJob(p => ({...p, [field]: value}));
-    const handleItemChange = (type, i, field, value) => {
-        const updatedItems = editableJob[type].map((item, idx) => idx === i ? { ...item, [field]: value } : item);
-        setEditableJob(prev => ({ ...prev, [type]: updatedItems }));
-    };
-    const handleAddItem = (type) => setEditableJob(p => ({ ...p, [type]: [...(p[type] || []), type === 'labour' ? { description: '', hours: 1, rate: 50 } : { name: '', quantity: 1, cost: 10 }] }));
-    const handleRemoveItem = (type, i) => setEditableJob(p => ({ ...p, [type]: p[type].filter((_, idx) => idx !== i) }));
-
-    const handleSave = async () => {
-        setIsSaving(true);
-        await onSave(editableJob);
-        setIsSaving(false);
-    };
-
-    useEffect(() => {
-        if (editableJob) {
-            const totals = calculateJobTotal(editableJob);
-            if (totals.total !== editableJob.total || totals.subTotal !== editableJob.subTotal) {
-                setEditableJob(prev => ({ ...prev, ...totals }));
-            }
-        }
-    }, [editableJob?.labour, editableJob?.materials, editableJob?.taxRate]);
-
-    if (!editableJob) return <div className="flex items-center justify-center h-full"><Loader className="animate-spin mr-2"/>Loading job details...</div>;
-
     return (
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
-            <div className="flex flex-col md:flex-row justify-between md:items-start mb-4 space-y-4 md:space-y-0">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-bold">{editableJob.jobTitle}</h2>
-                    <p className="text-gray-500">{job.customer?.name}</p>
-                </div>
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto">
-                    <ActionButton icon={<Save size={16}/>} label={isSaving ? 'Saving...' : 'Save Job'} onClick={handleSave} disabled={isSaving}/>
-                    {!job.quote && <ActionButton icon={<FileText size={16}/>} label="Generate Quote" onClick={() => onGenerateQuote(job)}/>}
-                    {job.quote && !job.invoice && <ActionButton icon={<FileText size={16}/>} label="Generate Invoice" onClick={() => onGenerateInvoice(job)}/>}
-                    <button onClick={onBack} className="flex items-center justify-center w-full sm:w-auto px-4 py-2 rounded-md hover:bg-gray-100">
-                        <ChevronLeft size={16} className="mr-1"/>
-                        Back
-                    </button>
-                </div>
-            </div>
-            <div className="mt-6">
-                <div>
-                    <h3 className="text-lg font-bold">Labour</h3>
-                    {(editableJob.labour || []).map((l, i) => (
-                        <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
-                            <input type="text" placeholder="Description" value={l.description} onChange={e => handleItemChange('labour', i, 'description', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
-                            <input type="number" placeholder="Hours" value={l.hours} onChange={e => handleItemChange('labour', i, 'hours', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                            <input type="number" placeholder="Rate" value={l.rate} onChange={e => handleItemChange('labour', i, 'rate', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                            <button onClick={() => handleRemoveItem('labour', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
-                        </div>
-                    ))}
-                    <button onClick={() => handleAddItem('labour')} className="mt-2 text-indigo-600 flex items-center">
-                        <Plus size={16} className="mr-1" />Add Labour
-                    </button>
-                </div>
-                <div className="mt-4">
-                    <h3 className="text-lg font-bold">Materials</h3>
-                    {(editableJob.materials || []).map((m, i) => (
-                         <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2 items-center">
-                            <input type="text" placeholder="Name" value={m.name} onChange={e => handleItemChange('materials', i, 'name', e.target.value)} className="p-2 border rounded w-full sm:col-span-2"/>
-                            <input type="number" placeholder="Quantity" value={m.quantity} onChange={e => handleItemChange('materials', i, 'quantity', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                            <input type="number" placeholder="Cost" value={m.cost} onChange={e => handleItemChange('materials', i, 'cost', parseFloat(e.target.value))} className="p-2 border rounded w-full"/>
-                            <button onClick={() => handleRemoveItem('materials', i)} className="text-red-500 sm:justify-self-center"><Trash2/></button>
-                        </div>
-                    ))}
-                    <button onClick={() => handleAddItem('materials')} className="mt-2 text-indigo-600 flex items-center">
-                        <Plus size={16} className="mr-1" />Add Material
-                    </button>
-                </div>
-            </div>
-            <div className="mt-6 text-right">
-                <p>Subtotal: {formatCurrency(editableJob.subTotal)}</p>
-                <p>Tax ({editableJob.taxRate || 13.5}%): {formatCurrency(editableJob.taxAmount)}</p>
-                <p className="font-bold text-lg">Total: {formatCurrency(editableJob.total)}</p>
-            </div>
-        </div>
+        <ErrorBoundary>
+            <App />
+        </ErrorBoundary>
     );
 }
-
-const TabButton = ({ icon, label, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`flex flex-col md:flex-row items-center justify-center flex-1 md:flex-initial md:justify-start w-full p-2 md:p-3 md:my-1 rounded-lg transition-colors ${
-            isActive ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
-        }`}
-    >
-        {icon}
-        <span className="mt-1 md:mt-0 md:ml-3 text-xs md:text-sm font-semibold">{label}</span>
-    </button>
-);
-
-const ActionButton = ({ icon, label, onClick }) => (
-    <button onClick={onClick} className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition-colors text-sm">
-        {icon}
-        <span className="ml-2 font-semibold">{label}</span>
-    </button>
-);
-
-const Modal = ({ children, onClose }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-2 sm:p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm sm:max-w-md max-h-full overflow-y-auto">
-            <div className="p-4 border-b flex justify-end items-center">
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                    <X size={24} />
-                </button>
-            </div>
-            <div className="p-4">
-                {children}
-            </div>
-        </div>
-    </div>
-);
-
-const CustomerForm = ({ data, onSave, onClose, isSaving }) => {
-    const [customer, setCustomer] = useState(data || { name: '', email: '', phone: '', address: '' });
-    const handleChange = (e) => setCustomer(p => ({ ...p, [e.target.name]: e.target.value }));
-    const handleSubmit = (e) => { e.preventDefault(); onSave(customer); };
-    return (
-        <form onSubmit={handleSubmit}>
-            <h3 className="text-lg font-semibold mb-4">{data ? 'Edit Customer' : 'New Customer'}</h3>
-            <fieldset disabled={isSaving} className="space-y-3">
-                <input name="name" value={customer.name} onChange={handleChange} placeholder="Name" className="w-full p-2 border rounded" required />
-                <input name="email" value={customer.email} onChange={handleChange} placeholder="Email" type="email" className="w-full p-2 border rounded" />
-                <input name="phone" value={customer.phone} onChange={handleChange} placeholder="Phone" className="w-full p-2 border rounded" />
-                <textarea name="address" value={customer.address} onChange={handleChange} placeholder="Address" className="w-full p-2 border rounded" rows="3" />
-            </fieldset>
-            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 space-y-2 space-y-reverse sm:space-y-0">
-                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto disabled:bg-indigo-400" disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Save'}
-                </button>
-                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto" disabled={isSaving}>
-                    Cancel
-                </button>
-            </div>
-        </form>
-    );
-};
-
-const JobForm = ({ data, customers, onSave, onClose }) => {
-    const [job, setJob] = useState(data || { jobTitle: '', customerId: '', status: 'New' });
-    const handleChange = (e) => setJob(p => ({ ...p, [e.target.name]: e.target.value }));
-    const handleSubmit = (e) => { e.preventDefault(); onSave(job); };
-    return (
-        <form onSubmit={handleSubmit}>
-            <h3 className="text-lg font-semibold mb-4">{data ? 'Edit Job' : 'New Job'}</h3>
-            <div className="space-y-3">
-                <input name="jobTitle" value={job.jobTitle} onChange={handleChange} placeholder="Job Title" className="w-full p-2 border rounded" required />
-                <select name="customerId" value={job.customerId} onChange={handleChange} className="w-full p-2 border rounded" required>
-                    <option value="">Select Customer</option>
-                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-            </div>
-            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 space-y-2 space-y-reverse sm:space-y-0">
-                <button type="submit" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save</button>
-                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 w-full sm:w-auto">Cancel</button>
-            </div>
-        </form>
-    );
-};
-
-const SendDocumentModal = ({ data, onClose }) => {
-    // Placeholder
-    return (
-        <div>
-            <h3 className="text-lg font-semibold mb-4">Send Document</h3>
-            <p>Sending functionality is not implemented in this version.</p>
-            <div className="mt-5 flex justify-end">
-                <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Close</button>
-            </div>
-        </div>
-    );
-};
-
-const JobStatusBadge = ({ status }) => {
-    const statusConfig = {
-        New: 'bg-blue-100 text-blue-800',
-        Quoted: 'bg-yellow-100 text-yellow-800',
-        Invoiced: 'bg-purple-100 text-purple-800',
-        Paid: 'bg-green-100 text-green-800',
-    };
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[status] || 'bg-gray-100'}`}>{status}</span>;
-};
-
-const StatCard = ({ title, value, icon }) => (
-    <div className="bg-white p-4 rounded-lg shadow flex items-center">
-        <div className="mr-4">{icon}</div>
-        <div>
-            <p className="text-sm text-gray-500">{title}</p>
-            <p className="text-xl font-bold text-gray-800">{value}</p>
-        </div>
-    </div>
-);

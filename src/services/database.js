@@ -10,8 +10,6 @@ const initializeDB = async () => {
     try {
         const platform = Capacitor.getPlatform();
         if (platform === "web") {
-            const jeepSqlite = document.createElement("jeep-sqlite");
-            document.body.appendChild(jeepSqlite);
             await customElements.whenDefined('jeep-sqlite');
             await sqlite.initWebStore();
         }
