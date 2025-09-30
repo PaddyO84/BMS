@@ -101,7 +101,7 @@ function App() {
             onSaveProfile={handleSaveProfile}
             onSaveCustomer={handleSaveCustomer}
             onSaveJob={handleSaveJob}
-            handleBackup={handleBackup}
+            onRefresh={fetchData}
             modal={modal}
             setModal={setModal}
         />

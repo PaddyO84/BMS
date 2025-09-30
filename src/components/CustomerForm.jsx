@@ -9,9 +9,9 @@ const CustomerForm = ({ data, onSave, onClose }) => {
         setCustomer(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onSave(customer);
+        await onSave(customer);
     };
 
     return (

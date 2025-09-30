@@ -23,7 +23,8 @@
     "lucide-react": "^0.395.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.24.0"
+    "react-router-dom": "^6.24.0",
+    "use-pull-to-refresh": "^2.4.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^5.7.4",

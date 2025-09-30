@@ -15,7 +15,7 @@ const AppRouter = ({
     onSaveProfile,
     onSaveCustomer,
     onSaveJob,
-    handleBackup,
+    onRefresh,
     modal,
     setModal,
 }) => {
@@ -44,7 +44,7 @@ const AppRouter = ({
                             customers={customers}
                             onSaveCustomer={onSaveCustomer}
                             onSaveJob={onSaveJob}
-                            handleBackup={handleBackup}
+                            onRefresh={onRefresh}
                             modal={modal}
                             setModal={setModal}
                         />

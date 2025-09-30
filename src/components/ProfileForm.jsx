@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Image as ImageIcon } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 const ProfileForm = ({ profile, onSave }) => {
-    const [formData, setFormData] = useState(profile);
+    const [formData, setFormData] = useState(profile || {});
+
+    useEffect(() => {
+        if (profile) {
+            setFormData(profile);
+        }
+    }, [profile]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
