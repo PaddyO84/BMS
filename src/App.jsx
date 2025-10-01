@@ -12,6 +12,7 @@ function App() {
     const [customers, setCustomers] = useState([]);
     const [jobs, setJobs] = useState([]);
     const [profile, setProfile] = useState(null);
+    const [appSettings, setAppSettings] = useState({});
     const [modal, setModal] = useState(null);
 
     const fetchData = async () => {
@@ -21,10 +22,17 @@ function App() {
         setJobs([...jobsData]);
         const profileData = await db.getBusinessProfile();
         setProfile(profileData);
+        const settingsData = await db.getAppSettings();
+        setAppSettings(settingsData);
     };
 
     const handleSaveProfile = async (profileData) => {
         await db.updateBusinessProfile(profileData);
+        await fetchData();
+    };
+
+    const handleUpdateSetting = async (key, value) => {
+        await db.updateAppSetting(key, value);
         await fetchData();
     };
 
@@ -34,6 +42,16 @@ function App() {
             alert('Backup created successfully!');
         } else {
             alert('Backup failed. Check logs for details.');
+        }
+    };
+
+    const handleRestore = async () => {
+        const success = await backup.restoreBackup();
+        if (success) {
+            alert('Restore completed successfully!');
+            await fetchData();
+        } else {
+            alert('Restore failed. Check logs for details.');
         }
     };
 
@@ -98,10 +116,13 @@ function App() {
             customers={customers}
             jobs={jobs}
             profile={profile}
+            appSettings={appSettings}
             onSaveProfile={handleSaveProfile}
+            onUpdateSetting={handleUpdateSetting}
             onSaveCustomer={handleSaveCustomer}
             onSaveJob={handleSaveJob}
             handleBackup={handleBackup}
+            handleRestore={handleRestore}
             modal={modal}
             setModal={setModal}
         />

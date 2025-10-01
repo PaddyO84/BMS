@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 
 const CustomerForm = ({ data, onSave, onClose }) => {
-    const [customer, setCustomer] = useState(data || { name: '', email: '', phone: '', address: '' });
+    const [customer, setCustomer] = useState(data || { name: '', companyName: '', email: '', phoneNumbers: '', roleTitle: '', address: '' });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -16,11 +16,13 @@ const CustomerForm = ({ data, onSave, onClose }) => {
 
     return (
         <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg">
-            <h2 className="text-2xl font-bold mb-6">{data ? 'Edit Customer' : 'New Customer'}</h2>
+            <h2 className="text-2xl font-bold mb-6">{data.id ? 'Edit Customer' : 'New Customer'}</h2>
             <div className="grid grid-cols-1 gap-4">
                 <input name="name" value={customer.name} onChange={handleChange} placeholder="Name" className="p-2 border rounded-md" required />
+                <input name="companyName" value={customer.companyName} onChange={handleChange} placeholder="Company Name" className="p-2 border rounded-md" />
                 <input name="email" type="email" value={customer.email} onChange={handleChange} placeholder="Email" className="p-2 border rounded-md" />
-                <input name="phone" value={customer.phone} onChange={handleChange} placeholder="Phone" className="p-2 border rounded-md" />
+                <input name="phoneNumbers" value={customer.phoneNumbers} onChange={handleChange} placeholder="Phone Number(s)" className="p-2 border rounded-md" />
+                <input name="roleTitle" value={customer.roleTitle} onChange={handleChange} placeholder="Role Title" className="p-2 border rounded-md" />
                 <input name="address" value={customer.address} onChange={handleChange} placeholder="Address" className="p-2 border rounded-md" />
             </div>
             <div className="flex justify-end space-x-4 mt-6">

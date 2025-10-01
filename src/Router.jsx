@@ -1,21 +1,26 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, useParams } from 'react-router-dom';
 
-import MainLayout from './layouts/MainLayout';
-import DashboardView from './views/DashboardView';
-import CustomerListView from './views/CustomerListView';
-import JobListView from './views/JobListView';
-import ProfileView from './views/ProfileView';
+import MainLayout from './components/layout/MainLayout';
+import JobsView from './views/JobsView';
+import CalendarView from './views/CalendarView';
+import RemindersView from './views/RemindersView';
+import SettingsView from './views/SettingsView';
 import JobDetailView from './components/JobDetailView';
+import CustomerListView from './views/CustomerListView';
+import ProfileView from './views/ProfileView';
 
 const AppRouter = ({
     customers,
     jobs,
     profile,
+    appSettings,
     onSaveProfile,
+    onUpdateSetting,
     onSaveCustomer,
     onSaveJob,
     handleBackup,
+    handleRestore,
     modal,
     setModal,
 }) => {
@@ -36,27 +41,18 @@ const AppRouter = ({
 
     return (
         <Router>
-            <Routes>
-                <Route
-                    path="/"
-                    element={
-                        <MainLayout
-                            customers={customers}
-                            onSaveCustomer={onSaveCustomer}
-                            onSaveJob={onSaveJob}
-                            handleBackup={handleBackup}
-                            modal={modal}
-                            setModal={setModal}
-                        />
-                    }
-                >
-                    <Route index element={<DashboardView jobs={jobs} />} />
-                    <Route path="customers" element={<CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })} />} />
-                    <Route path="jobs" element={<JobListView jobs={jobs} customers={customers} />} />
-                    <Route path="jobs/:id" element={<JobDetailWrapper />} />
-                    <Route path="profile" element={<ProfileView profile={profile} onSave={onSaveProfile} />} />
-                </Route>
-            </Routes>
+            <MainLayout>
+                <Routes>
+                    <Route path="/" element={<JobsView jobs={jobs} customers={customers} />} />
+                    <Route path="/calendar" element={<CalendarView jobs={jobs} />} />
+                    <Route path="/reminders" element={<RemindersView />} />
+                    <Route path="/settings" element={<SettingsView appSettings={appSettings} onUpdateSetting={onUpdateSetting} handleBackup={handleBackup} handleRestore={handleRestore} />} />
+                    <Route path="/customers" element={<CustomerListView customers={customers} onEdit={(c) => setModal({ type: 'customer', data: c })} setModal={setModal} />} />
+                    <Route path="/customer/:id" element={<CustomerDetails customers={customers} jobs={jobs} setModal={setModal} />} />
+                    <Route path="/job/:id" element={<JobDetailWrapper />} />
+                    <Route path="/profile" element={<ProfileView profile={profile} onSave={onSaveProfile} />} />
+                </Routes>
+            </MainLayout>
         </Router>
     );
 };

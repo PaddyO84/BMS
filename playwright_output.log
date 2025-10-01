@@ -1,0 +1,8 @@
+BROWSER CONSOLE: [vite] connecting...
+BROWSER CONSOLE: [vite] connected.
+BROWSER CONSOLE: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+An error occurred during verification: Locator expected to be visible
+Actual value: <element(s) not found>
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for get_by_role("link", name="Jobs")

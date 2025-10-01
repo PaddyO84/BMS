@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Plus, Trash2, ArrowLeft, Save, FileText } from 'lucide-react';
+import { Loader, Plus, Trash2, ArrowLeft, Save, FileText, Camera } from 'lucide-react';
 import { calculateJobTotal, formatDate } from '../utils/helpers';
 import { generateInvoice } from '../services/pdf';
+import { Camera as CapacitorCamera, CameraResultType } from '@capacitor/camera';
 
 const JobDetailView = ({ job, profile, onSave }) => {
     const [editableJob, setEditableJob] = useState(job);
@@ -10,40 +11,54 @@ const JobDetailView = ({ job, profile, onSave }) => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Recalculate totals when job data changes
         if (job) {
-            const totals = calculateJobTotal(job);
-            setEditableJob({ ...job, ...totals });
+            updateJobState(job);
         }
     }, [job]);
 
+    const updateJobState = (newJobState) => {
+        const totals = calculateJobTotal(newJobState);
+        setEditableJob({ ...newJobState, ...totals });
+    };
+
     const handleFieldChange = (field, value) => {
-        setEditableJob(prev => ({ ...prev, [field]: value }));
+        updateJobState({ ...editableJob, [field]: value });
     };
 
     const handleItemChange = (type, index, field, value) => {
         const items = editableJob[type].map((item, i) =>
             i === index ? { ...item, [field]: value } : item
         );
-        const newJobState = { ...editableJob, [type]: items };
-        const totals = calculateJobTotal(newJobState);
-        setEditableJob({ ...newJobState, ...totals });
+        updateJobState({ ...editableJob, [type]: items });
     };
 
     const handleAddItem = (type) => {
-        const newItem = type === 'labour'
-            ? { description: '', hours: 1, rate: 50 }
-            : { name: '', quantity: 1, cost: 10 };
-        const newJobState = { ...editableJob, [type]: [...(editableJob[type] || []), newItem] };
-        const totals = calculateJobTotal(newJobState);
-        setEditableJob({ ...newJobState, ...totals });
+        let newItem;
+        switch (type) {
+            case 'labour':
+                newItem = { description: '', hours: 1, rate: 50 };
+                break;
+            case 'materials':
+                newItem = { name: '', quantity: 1, cost: 10 };
+                break;
+            case 'tasks':
+                newItem = { description: '', completed: 0 };
+                break;
+            case 'vendors':
+                newItem = { name: '', contact: '' };
+                break;
+            case 'images':
+                newItem = { type: 'receipt', imagePath: '' };
+                break;
+            default:
+                return;
+        }
+        updateJobState({ ...editableJob, [type]: [...(editableJob[type] || []), newItem] });
     };
 
     const handleRemoveItem = (type, index) => {
         const items = editableJob[type].filter((_, i) => i !== index);
-        const newJobState = { ...editableJob, [type]: items };
-        const totals = calculateJobTotal(newJobState);
-        setEditableJob({ ...newJobState, ...totals });
+        updateJobState({ ...editableJob, [type]: items });
     };
 
     const handleSave = async () => {
@@ -55,6 +70,23 @@ const JobDetailView = ({ job, profile, onSave }) => {
     const handleDownloadInvoice = () => {
         if (editableJob && profile) {
             generateInvoice(editableJob, profile);
+        }
+    };
+
+    const takePicture = async (type) => {
+        try {
+            const image = await CapacitorCamera.getPhoto({
+                quality: 90,
+                allowEditing: false,
+                resultType: CameraResultType.Uri
+            });
+            const imagePath = image.webPath || image.path;
+            if (imagePath) {
+                const newImage = { type, imagePath };
+                updateJobState({ ...editableJob, images: [...(editableJob.images || []), newImage] });
+            }
+        } catch (error) {
+            console.error("Error taking picture:", error);
         }
     };
 
@@ -90,6 +122,52 @@ const JobDetailView = ({ job, profile, onSave }) => {
                         <option>In Progress</option>
                         <option>Completed</option>
                     </select>
+                    <input type="date" value={(editableJob.dateRequested || '').split('T')[0]} onChange={e => handleFieldChange('dateRequested', e.target.value)} className="p-2 border rounded-md" />
+                </div>
+
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-2">Tasks</h3>
+                    {(editableJob.tasks || []).map((item, i) => (
+                        <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                            <input type="text" value={item.description} onChange={e => handleItemChange('tasks', i, 'description', e.target.value)} className="col-span-3 p-2 border rounded-md" placeholder="Task Description" />
+                            <div className="flex items-center">
+                                <input type="checkbox" checked={!!item.completed} onChange={e => handleItemChange('tasks', i, 'completed', e.target.checked ? 1 : 0)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded" />
+                                <label className="ml-2 text-gray-700">Completed</label>
+                            </div>
+                            <button onClick={() => handleRemoveItem('tasks', i)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
+                        </div>
+                    ))}
+                    <button onClick={() => handleAddItem('tasks')} className="mt-2 text-indigo-600 flex items-center"><Plus size={16} className="mr-1"/>Add Task</button>
+                </div>
+
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-2">Vendors</h3>
+                    {(editableJob.vendors || []).map((item, i) => (
+                        <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                            <input type="text" value={item.name} onChange={e => handleItemChange('vendors', i, 'name', e.target.value)} className="col-span-2 p-2 border rounded-md" placeholder="Vendor Name" />
+                            <input type="text" value={item.contact} onChange={e => handleItemChange('vendors', i, 'contact', e.target.value)} className="col-span-2 p-2 border rounded-md" placeholder="Contact Info" />
+                            <button onClick={() => handleRemoveItem('vendors', i)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
+                        </div>
+                    ))}
+                    <button onClick={() => handleAddItem('vendors')} className="mt-2 text-indigo-600 flex items-center"><Plus size={16} className="mr-1"/>Add Vendor</button>
+                </div>
+
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-2">Images</h3>
+                    {(editableJob.images || []).map((item, i) => (
+                        <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                            <img src={item.imagePath} alt={item.type} className="w-16 h-16 object-cover rounded-md" />
+                            <div className="col-span-3">
+                                <p className="font-semibold">{item.type}</p>
+                                <p className="text-xs text-gray-500 truncate">{item.imagePath}</p>
+                            </div>
+                            <button onClick={() => handleRemoveItem('images', i)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
+                        </div>
+                    ))}
+                    <div className="flex space-x-2 mt-2">
+                        <button onClick={() => takePicture('receipt')} className="text-indigo-600 flex items-center"><Camera size={16} className="mr-1"/>Add Receipt</button>
+                        <button onClick={() => takePicture('ongoing-work')} className="text-indigo-600 flex items-center"><Camera size={16} className="mr-1"/>Add Work Photo</button>
+                    </div>
                 </div>
 
                 <div className="mt-6">
